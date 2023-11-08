@@ -1,9 +1,31 @@
 <template lang="pug">
-router-view
+.aresrpg(v-if="webgl_available")
+  .canvas(ref='renderer_container')
+.no_webgl(v-else) It seems WebGL is not available in your browser, please use a descent one 😀
 </template>
 
 <script setup>
-const name = 'app';
+import { onMounted, onUnmounted, ref } from 'vue'
+import WebGL from 'three/addons/capabilities/WebGL.js'
+
+import create_game from './game.js'
+
+const name = 'app'
+
+const renderer_container = ref(null)
+const webgl_available = ref(true)
+const game = create_game()
+
+onMounted(async () => {
+  const { start } = await game
+  if (WebGL.isWebGLAvailable()) start(renderer_container.value)
+  else webgl_available.value = false
+})
+
+onUnmounted(async () => {
+  const { stop } = await game
+  stop()
+})
 </script>
 
 <style lang="stylus">
@@ -43,4 +65,15 @@ sc-disableScollBar()
     :active
       color #e1c79b
       fill #e1c79b
+
+.aresrpg
+  width 100vw
+  height 100vh
+
+.no_webgl
+  display flex
+  justify-content center
+  align-items center
+  height 100vh
+  color #e1c79b
 </style>

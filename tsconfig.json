@@ -1,0 +1,18 @@
+{
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.vue"],
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "resolveJsonModule": true,
+    "outDir": "types",
+    "skipLibCheck": true,
+    "types": ["vite-plugin-pwa/client"]
+  }
+}

@@ -1,10 +1,12 @@
-import { defineConfig } from 'vite';
-import vue from '@vitejs/plugin-vue';
-import { VitePWA } from 'vite-plugin-pwa';
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { VitePWA } from 'vite-plugin-pwa'
+import wasm from 'vite-plugin-wasm'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
+    wasm(),
     vue(),
     VitePWA({
       includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
@@ -64,4 +66,4 @@ export default defineConfig({
       },
     }),
   ],
-});
+})
