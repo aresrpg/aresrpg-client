@@ -4,7 +4,8 @@
   "parserOptions": {
     "requireConfigFile": false,
     "sourceType": "module",
-    "ecmaVersion": "latest"
+    "ecmaVersion": "latest",
+    "parser": "@typescript-eslint/parser"
   },
   "rules": {
     "camelcase": "off",
@@ -19,6 +20,7 @@
     "prefer-numeric-literals": "error",
     "import/order": ["error", { "newlines-between": "always" }],
     "no-unused-vars": 0,// <script setup>
-    "node/no-callback-literal": 0
+    "node/no-callback-literal": 0,
+    "no-dupe-class-members": 0
   }
 }

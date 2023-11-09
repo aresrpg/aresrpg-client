@@ -1,5 +1,5 @@
 {
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "events-polyfill.js"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.vue"],
   "compilerOptions": {
     "allowJs": true,

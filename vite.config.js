@@ -1,10 +1,19 @@
+import path from 'path'
+
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import wasm from 'vite-plugin-wasm'
 
+const events = path.resolve(__dirname, './events-polyfill.js')
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: {
+      events,
+    },
+  },
   plugins: [
     wasm(),
     vue(),

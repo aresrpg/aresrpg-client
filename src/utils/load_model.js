@@ -16,7 +16,7 @@ export async function load_gltf(path) {
   return model
 }
 
-/** @type {(string) => Promise<import('three').Object3D>} */
+/** @type {(path: string, scale?: number) => Promise<Type.Entity>} */
 export async function load_fbx(path, scale = 0.01) {
   const model = await new Promise((resolve, reject) => {
     new FBXLoader().load(path, resolve, null, reject)
@@ -30,7 +30,6 @@ export async function load_fbx(path, scale = 0.01) {
   })
 
   model.position.set(0, 0, 0)
-
   return model
 }
 

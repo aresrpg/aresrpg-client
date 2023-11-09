@@ -1,45 +1,44 @@
+import { on } from 'events'
+
 import Stats from 'stats.js'
+import { aiter } from 'iterator-helper'
 
-import { Actions, pop_actions } from '../actions.js'
+/** @type {Type.Module} */
+export default {
+  reduce(state, { type, payload }) {
+    if (type === 'SHOW_FPS')
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          ui_fps_enabled: payload,
+        },
+      }
 
-/** @type {import("../game").Module} */
-export default function () {
-  let stats = null
+    return state
+  },
+  observe({ events, dispatch }) {
+    let stats = null
 
-  function show_stats(show) {
-    if (show && !stats) {
-      stats = new Stats()
-      stats.showPanel(0) // 0: fps, 1: ms, 2: mb, 3+: custom
-      window.document.body.appendChild(stats.dom)
-    } else if (!show && stats) {
-      window.document.body.removeChild(stats.dom)
-      stats = null
+    function show_stats(show) {
+      if (show && !stats) {
+        stats = new Stats()
+        stats.showPanel(0) // 0: fps, 1: ms, 2: mb, 3+: custom
+        window.document.body.appendChild(stats.dom)
+      } else if (!show && stats) {
+        window.document.body.removeChild(stats.dom)
+        stats = null
+      }
     }
-  }
 
-  return (state, delta) => {
-    const {
-      pending_client_actions,
-      settings,
-      settings: { ui_fps_enabled },
-    } = state
+    events.on('FRAME', () => stats?.update())
 
-    if (ui_fps_enabled && stats) stats.update()
+    aiter(on(events, 'STATE_UPDATED'))
+      .map(({ settings: { ui_fps_enabled } }) => ui_fps_enabled)
+      .reduce(({ last_ui_fps_enabled }, ui_fps_enabled) => {
+        if (ui_fps_enabled !== last_ui_fps_enabled) show_stats(ui_fps_enabled)
 
-    const [fps_actions, remaining_actions] = pop_actions(
-      [Actions.UI_FPS],
-      pending_client_actions,
-    )
-
-    fps_actions.forEach(show_stats)
-
-    return {
-      ...state,
-      pending_client_actions: remaining_actions,
-      settings: {
-        ...settings,
-        ui_fps_enabled: !!stats,
-      },
-    }
-  }
+        return { last_ui_fps_enabled: ui_fps_enabled }
+      })
+  },
 }
