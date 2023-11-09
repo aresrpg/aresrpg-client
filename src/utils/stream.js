@@ -1,46 +1,3 @@
-export class PassThrough extends TransformStream {
-  constructor(options = {}) {
-    const { signal } = options
-
-    // Pass the options including the signal to both readable and writable sides
-    super(
-      {
-        // Pass the signal to the transform function as well
-        transform(chunk, controller) {
-          controller.enqueue(chunk)
-        },
-      },
-      { signal },
-      { signal },
-    )
-
-    this.signal = signal
-  }
-
-  [Symbol.asyncIterator]() {
-    const reader = this.readable.getReader()
-
-    // Return a new async iterator which respects the abort signal
-    return {
-      next: () => {
-        if (this.signal && this.signal.aborted) {
-          return Promise.reject(
-            new DOMException('This stream has been aborted', 'AbortError'),
-          )
-        }
-        return reader.read()
-      },
-      return: () => {
-        reader.releaseLock()
-        return Promise.resolve({ done: true })
-      },
-      [Symbol.asyncIterator]() {
-        return this
-      },
-    }
-  }
-}
-
 export class WebSocketStream extends ReadableStream {
   constructor(url) {
     let socket
@@ -95,10 +52,10 @@ export class ObjectArrayStream extends ReadableStream {
   constructor(dataArray) {
     super({
       start(controller) {
-        for (const item of dataArray) {
-          controller.enqueue(item)
-        }
-        controller.close() // Close the stream after enqueuing all objects
+        setTimeout(() => {
+          for (const item of dataArray) controller.enqueue(item)
+          controller.close() // Close the stream after enqueuing all objects
+        }, 1000)
       },
       cancel() {
         // Handle any cleanup if necessary
@@ -110,7 +67,15 @@ export class ObjectArrayStream extends ReadableStream {
     const reader = this.getReader()
     return {
       next() {
-        return reader.read()
+        return reader.read().then(result => {
+          if (result.done) {
+            // If the stream is done, return an object with done: true
+            return { value: undefined, done: true }
+          } else {
+            // Otherwise, return the value and done: false
+            return { value: result.value, done: false }
+          }
+        })
       },
       return() {
         reader.releaseLock()
@@ -118,7 +83,7 @@ export class ObjectArrayStream extends ReadableStream {
       },
       throw(error) {
         reader.releaseLock()
-        return Promise.reject(error)
+        throw error
       },
       [Symbol.asyncIterator]() {
         return this

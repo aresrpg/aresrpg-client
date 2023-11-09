@@ -77,7 +77,7 @@ declare namespace Type {
   type Module = import('./src/game').Module
 
   type Packets = {
-    'packet:ADD_LIGHT': { type: string; [key: string]: any }
+    'packet:LIGHT_ADD': { type: string; [key: string]: any }
     'packet:ENTITY_ADD': {
       id: string
       type: string
@@ -104,6 +104,10 @@ declare namespace Type {
       [key: string]: any
     }
     SHOW_BOUNDING_BOXES: boolean
+    KEYDOWN: string
+    KEYUP: string
+    PLAYER_ON_GROUND: boolean
+    PLAYER_MOVE: [number, number, number]
   } & Packets
 
   type Events = TypedEmitter<

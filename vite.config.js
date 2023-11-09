@@ -1,22 +1,28 @@
-import path from 'path'
-
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import wasm from 'vite-plugin-wasm'
-
-const events = path.resolve(__dirname, './events-polyfill.js')
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
     alias: {
-      events,
+      events: 'events-polyfill',
     },
   },
   plugins: [
     wasm(),
     vue(),
+    nodePolyfills({
+      // To add only specific polyfills, add them here. If no option is passed, adds all polyfills
+      include: ['stream', 'events', 'path'],
+      overrides: {
+        events: 'events-polyfill',
+      },
+      // Whether to polyfill `node:` protocol imports.
+      protocolImports: true,
+    }),
     VitePWA({
       includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
       registerType: 'autoUpdate',

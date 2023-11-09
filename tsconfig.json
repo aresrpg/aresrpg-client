@@ -1,5 +1,5 @@
 {
-  "include": ["src/**/*", "events-polyfill.js"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.vue"],
   "compilerOptions": {
     "allowJs": true,
@@ -13,6 +13,6 @@
     "resolveJsonModule": true,
     "outDir": "types",
     "skipLibCheck": true,
-    "types": ["vite-plugin-pwa/client"]
+    "types": ["vite-plugin-pwa/client", "node"]
   }
 }

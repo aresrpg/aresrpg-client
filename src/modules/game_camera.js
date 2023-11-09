@@ -8,12 +8,20 @@ import { combine, named_on } from '../utils/iterator.js'
 
 const CAMERA_MIN_POLAR_ANGLE = 0
 const CAMERA_MAX_POLAR_ANGLE = Math.PI * 0.5 * 0.7 //  70% of the half PI
-const CAMERA_MIN_ZOOM = 5
-const CAMERA_MAX_ZOOM = 50
+const CAMERA_MIN_ZOOM = 3.5
+const CAMERA_MAX_ZOOM = 15
 
 /** @type {import("../game").Module} */
 export default {
-  observe({ camera, lock_controls, events, get_state }) {
+  observe({
+    camera,
+    lock_controls,
+    events,
+    get_state,
+    renderer,
+    scene,
+    world,
+  }) {
     camera.position.set(0, 5, 10)
 
     aiter(
@@ -30,8 +38,8 @@ export default {
             const {
               settings: { mouse_sensitivity },
             } = get_state()
-            const { camera_rotation } = data
             const { movementX, movementY } = payload
+            const { camera_rotation } = data
 
             camera_rotation.y -= movementX * mouse_sensitivity
             camera_rotation.x += movementY * mouse_sensitivity
@@ -39,58 +47,58 @@ export default {
               CAMERA_MIN_POLAR_ANGLE,
               Math.min(CAMERA_MAX_POLAR_ANGLE, camera_rotation.x),
             )
-
             return data
           }
 
           if (event === 'wheel') {
-            const { spherical_radius } = data
             const { deltaY } = payload
 
+            let spherical_radius = data.spherical_radius + deltaY * 0.05
+            spherical_radius = Math.max(
+              CAMERA_MIN_ZOOM,
+              Math.min(CAMERA_MAX_ZOOM, spherical_radius),
+            )
             return {
               ...data,
-              spherical_radius: Math.max(
-                CAMERA_MIN_ZOOM,
-                Math.min(CAMERA_MAX_ZOOM, spherical_radius + deltaY * 0.1),
-              ),
+              spherical_radius,
             }
           }
 
-          if (event === 'FRAME') {
+          if (event === 'FRAME' && payload.state.player.model) {
             const { spherical_radius, camera_rotation } = data
             const {
               state: {
                 player: { model },
               },
-              delta,
             } = payload
-            if (model) {
-              // Calculate the offset position from the player using spherical coordinates
-              const offset_x =
-                Math.sin(camera_rotation.y) *
-                Math.cos(camera_rotation.x) *
-                spherical_radius
-              const offset_y = Math.sin(camera_rotation.x) * spherical_radius
-              const offset_z =
-                Math.cos(camera_rotation.y) *
-                Math.cos(camera_rotation.x) *
-                spherical_radius
 
-              camera.position.set(
-                model.position.x + offset_x,
-                model.position.y + offset_y,
-                model.position.z + offset_z,
-              )
+            // Calculate the offset position from the player using spherical coordinates
+            const offset_x =
+              Math.sin(camera_rotation.y) *
+              Math.cos(camera_rotation.x) *
+              spherical_radius
+            const offset_y = Math.sin(camera_rotation.x) * spherical_radius
+            const offset_z =
+              Math.cos(camera_rotation.y) *
+              Math.cos(camera_rotation.x) *
+              spherical_radius
 
-              // Look at the player
-              camera.lookAt(
-                new Vector3(
-                  model.position.x,
-                  model.position.y + 1.5,
-                  model.position.z,
-                ),
-              )
-            }
+            camera.position.set(
+              model.position.x + offset_x,
+              model.position.y + offset_y,
+              model.position.z + offset_z,
+            )
+
+            // Look at the player
+            camera.lookAt(
+              new Vector3(
+                model.position.x,
+                model.position.y + 1.5,
+                model.position.z,
+              ),
+            )
+
+            renderer.render(scene, camera)
           }
 
           return data

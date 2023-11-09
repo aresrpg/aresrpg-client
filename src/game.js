@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events'
+import { PassThrough } from 'stream'
 
 import { Scene, Vector3, Color, WebGLRenderer, PerspectiveCamera } from 'three'
 import { World } from '@dimforge/rapier3d'
@@ -11,16 +12,16 @@ import { combine } from './utils/iterator.js'
 import ui_fps from './modules/ui_fps.js'
 import game_camera from './modules/game_camera.js'
 import game_lights from './modules/game_lights.js'
-import {
-  ObjectArrayStream,
-  PassThrough,
-  WebSocketStream,
-} from './utils/stream.js'
-import game_frame from './modules/game_frame.js'
+import { ObjectArrayStream, WebSocketStream } from './utils/stream.js'
 import mouse_lock from './modules/mouse_lock.js'
 import window_resize from './modules/window_resize.js'
+import entity_add from './modules/entity_add.js'
+import entity_bbox from './modules/entity_bbox.js'
+import player_inputs from './modules/player_inputs.js'
+import entity_movement from './modules/entity_movement.js'
 
 export const GRAVITY = 9.81
+export const PLAYER_ID = 'player'
 
 /** @typedef {typeof INITIAL_STATE} State */
 /** @typedef {Omit<Readonly<ReturnType<typeof create_context>>, 'actions'>} Context */
@@ -32,29 +33,44 @@ const INITIAL_STATE = {
   /** @type {Map<string, Type.Entity>} */
   entities: new Map(),
   settings: {
-    target_fps: 120,
+    target_fps: 60,
     mouse_sensitivity: 0.002,
     ui_fps_enabled: true,
-    key_forward: 'KeyW',
-    key_backward: 'KeyS',
-    key_left: 'KeyA',
-    key_right: 'KeyD',
-    key_jump: 'Space',
+    keymap: new Map([
+      ['KeyW', 'forward'],
+      ['KeyS', 'backward'],
+      ['KeyA', 'left'],
+      ['KeyD', 'right'],
+      ['Space', 'jump'],
+    ]),
     show_bounding_boxes: false,
   },
 
+  inputs: {
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
+    jump: false,
+  },
+
   player: {
+    id: PLAYER_ID,
+    type: 'character',
     /** @type {Type.Entity} */
     model: null,
-    physics: {
-      /** @type {import('@dimforge/rapier3d').RigidBody} */
-      rigid_body: null,
-      /** @type {import('@dimforge/rapier3d').Collider} */
-      collider: null,
-    },
+    move: position => {},
+    /** @type {import('@dimforge/rapier3d').Collider} */
+    collider: null,
+    /** @type {import('@dimforge/rapier3d').RigidBody} */
+    rigid_body: null,
+    remove: () => {},
     height: 2,
     radius: 0.5,
+    // represent the supposed position (for updates)
+    // the real position is inside the model
     position: new Vector3(),
+    on_ground: false,
   },
 }
 
@@ -62,14 +78,19 @@ const GAME_MODULES = [
   ui_fps,
   mouse_lock,
   window_resize,
+  entity_add,
+  entity_bbox,
+  entity_movement,
+  player_inputs,
   game_lights,
   game_camera,
-  game_frame,
 ]
 
 function last_event_value(emitter, event) {
   let value = null
-  emitter.on(event, new_value => (value = new_value))
+  emitter.on(event, new_value => {
+    value = new_value
+  })
   return () => value
 }
 
@@ -83,10 +104,11 @@ function create_context() {
     0.1, // Near clipping plane
     1000, // Far clipping plane
   )
+
   const lock_controls = new PointerLockControls(camera, document.body)
   /** @type {Type.Events} */
   const events = new EventEmitter()
-  const actions = new PassThrough()
+  const actions = new PassThrough({ objectMode: true })
   /** @type {() => State} */
   const get_state = last_event_value(events, 'STATE_UPDATED')
   return {
@@ -110,7 +132,7 @@ function create_context() {
 
 export default async function create_game() {
   const { actions, ...context } = create_context()
-  const { events, world, scene, renderer, get_state } = context
+  const { events, world, scene, renderer, get_state, camera } = context
 
   scene.background = new Color('#E0E0E0')
   renderer.setPixelRatio(window.devicePixelRatio)
@@ -120,9 +142,10 @@ export default async function create_game() {
   scene.add(infinite_grid({ world }))
 
   const packets = aiter(
+    // @ts-ignore
     new ObjectArrayStream([
       {
-        type: 'packet:ADD_LIGHT',
+        type: 'packet:LIGHT_ADD',
         payload: {
           type: 'directional',
           color: '#ffffff',
@@ -141,18 +164,23 @@ export default async function create_game() {
         },
       },
       {
-        type: 'packet:ADD_LIGHT',
+        type: 'packet:LIGHT_ADD',
         payload: {
           type: 'ambient',
           color: '#ffffff',
           intensity: 0.7,
         },
       },
+      {
+        type: 'packet:ENTITY_ADD',
+        payload: {
+          id: PLAYER_ID,
+          type: 'character',
+          position: [0, 30, 0],
+        },
+      },
     ]),
   )
-
-  // pipe the packets through the observers
-  packets.forEach(({ type, payload }) => events.emit(type, payload))
 
   // pipe the actions and packets through the reducers
   aiter(combine(packets, actions))
@@ -160,7 +188,21 @@ export default async function create_game() {
       (last_state, action) => {
         const state = GAME_MODULES.map(({ reduce }) => reduce)
           .filter(Boolean)
-          .reduce((intermediate, fn) => fn(intermediate, action), last_state)
+          .reduce((intermediate, fn) => {
+            const result = fn(intermediate, action)
+            if (!result) throw new Error(`Reducer ${fn} didn't return a state`)
+            return result
+          }, last_state)
+        // @ts-ignore
+        if (action.type.includes('packet:')) {
+          // @ts-ignore
+          console.log('%c◀️◀️', 'color: #FFA726;', action.type, action.payload)
+          // @ts-ignore
+          events.emit(action.type, action.payload)
+        } else {
+          // @ts-ignore
+          console.log('%c▶️', 'color: #4FC3F7;', action.type, action.payload)
+        }
         events.emit('STATE_UPDATED', state)
         return state
       },
@@ -188,8 +230,15 @@ export default async function create_game() {
       if (delta >= frame_duration) {
         const state = get_state()
         events.emit('FRAME', { state, delta })
+        world.step()
         last_frame_time = current_time - (delta % frame_duration)
-        frame_duration = 1000 / state.settings.target_fps
+
+        const updated_fps = state?.settings?.target_fps
+        if (
+          updated_fps != null &&
+          updated_fps !== INITIAL_STATE.settings.target_fps
+        )
+          frame_duration = 1000 / state.settings.target_fps
       }
     }
   }

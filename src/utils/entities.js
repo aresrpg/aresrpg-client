@@ -5,6 +5,7 @@ import {
   Object3D,
   Color,
   Vector3,
+  Box3,
 } from 'three'
 import { ColliderDesc, RigidBodyDesc } from '@dimforge/rapier3d'
 
@@ -42,47 +43,33 @@ export function create_capsule({
   return capsule
 }
 
-/**
- *
- * @param {Object} param
- * @param {import('@dimforge/rapier3d').World} param.world
- * @returns
- */
-export async function create_kinetic_entity({
+export function create_rigid_entity({
   world,
   height,
   radius,
-  position,
+  type = 'kinematic',
+  shape = 'capsule',
 }) {
-  // Create a dynamic body for the character
-  const rigid_body_descriptor = RigidBodyDesc.kinematicPositionBased()
-  const collider_descriptor = ColliderDesc.capsule(height, radius)
+  const rigid_body_descriptor =
+    type === 'kinematic'
+      ? RigidBodyDesc.kinematicPositionBased()
+      : type === 'dynamic'
+      ? RigidBodyDesc.dynamic()
+      : RigidBodyDesc.fixed()
+
+  const collider_descriptor = ColliderDesc[shape](height, radius)
   const rigid_body = world.createRigidBody(rigid_body_descriptor)
   const collider = world.createCollider(collider_descriptor, rigid_body)
 
-  rigid_body.setNextKinematicTranslation(position)
-
-  return { rigid_body, collider }
-}
-
-export async function create_character({ world, position }) {
-  const model = await load_fbx('src/models/guard.fbx')
-  const size = new Vector3()
-  const bounding_box = new Box3().setFromObject(model)
-
-  bounding_box.getSize(size)
-
-  const height = size.y
-  const radius = Math.max(size.x, size.z) * 0.5
-
-  const { rigid_body, collider } = await create_kinetic_entity({
-    world,
-    height,
-    radius,
-    position,
-  })
-
-  scene.add(model)
-
-  return { model, rigid_body, collider, height, radius }
+  return {
+    rigid_body,
+    collider,
+    move(position) {
+      if (type === 'kinematic') {
+        rigid_body.setNextKinematicTranslation(position)
+      } else if (type === 'dynamic') {
+        rigid_body.setTranslation(position)
+      } else throw new Error('Static rigid bodies cannot be moved')
+    },
+  }
 }

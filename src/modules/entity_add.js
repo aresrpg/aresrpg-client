@@ -1,30 +1,24 @@
 import { Vector3 } from 'three'
 
-import { create_capsule, create_character } from '../utils/entities.js'
+import Pool from '../pool.js'
+import { PLAYER_ID } from '../game.js'
 
 /** @type {Type.Module} */
 export default {
   reduce(state, { type, payload }) {
     if (type === 'ENTITY_ADD') {
-      const { id, type, model, physics, size } = payload
+      const { id, ...entity } = payload
 
-      if (id === 'player')
+      if (id === PLAYER_ID)
         return {
           ...state,
           player: {
-            model,
-            physics,
-            size,
+            id,
+            ...entity,
           },
         }
 
-      state.entities.set(id, {
-        id,
-        type,
-        model,
-        physics,
-        size,
-      })
+      state.entities.set(id, entity)
     }
     return state
   },
@@ -32,29 +26,21 @@ export default {
     events.on('packet:ENTITY_ADD', ({ id, type, position }) => {
       if (type === 'character') {
         const [x, y, z] = position
-        create_character({
-          world,
-          position: new Vector3(x, y, z),
-        })
-          .then(({ model, rigid_body, collider, height, radius }) => {
-            const entity = {
-              id,
-              type,
-              model,
-              physics: {
-                rigid_body,
-                collider,
-              },
-              height,
-              radius,
-            }
+        const pooled_entity = Pool.guard.get(world)
 
-            scene.add(model)
-            dispatch('ENTITY_ADD', entity)
-          })
-          .catch(error => {
-            console.error(error)
-          })
+        if (!pooled_entity) return
+
+        const entity = {
+          id,
+          type,
+          position: new Vector3(x, y, z),
+          on_ground: false,
+          ...pooled_entity,
+        }
+
+        entity.move(entity.position)
+        scene.add(entity.model)
+        dispatch('ENTITY_ADD', entity)
       }
     })
   },

@@ -32,7 +32,7 @@
     "eslint-plugin-n": "^16.2.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "6.1.1",
-    "eventemitter3": "^5.0.1",
+    "events-polyfill": "gist:e2c3b3969513bbd62c1dc2ba2a565fbf",
     "husky": "^4.3.8",
     "lint-staged": "15.0.2",
     "prettier": "3.0.3",
@@ -40,6 +40,7 @@
     "stylus": "^0.61.0",
     "typescript": "^5.2.2",
     "vite": "^4.5.0",
+    "vite-plugin-node-polyfills": "^0.16.0",
     "vite-plugin-pwa": "^0.16.7",
     "vite-plugin-wasm": "^3.2.2",
     "vue-eslint-parser": "^9.3.2"

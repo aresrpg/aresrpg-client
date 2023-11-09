@@ -43,27 +43,22 @@ export default {
     return state
   },
   observe({ events, get_state, scene, world, dispatch }) {
-    aiter(on(events, 'STATE_UPDATED'))
-      .map(([state]) => state)
-      .reduce(
-        (
-          last_show_bounding_boxes,
-          { show_bounding_boxes, entities, player },
-        ) => {
-          if (last_show_bounding_boxes !== show_bounding_boxes) {
-            // for all entities
-            for (const entity of entities.values()) {
-              if (entity.type === 'character')
-                display_bounding_box(show_bounding_boxes, entity)
-            }
-
-            // and also for the player
-            if (player.model)
-              display_bounding_box(show_bounding_boxes, player.model)
+    aiter(on(events, 'STATE_UPDATED')).reduce(
+      (last_show_bounding_boxes, { show_bounding_boxes, entities, player }) => {
+        if (last_show_bounding_boxes !== show_bounding_boxes) {
+          // for all entities
+          for (const entity of entities.values()) {
+            if (entity.type === 'character')
+              display_bounding_box(show_bounding_boxes, entity)
           }
 
-          return show_bounding_boxes
-        },
-      )
+          // and also for the player
+          if (player.model)
+            display_bounding_box(show_bounding_boxes, player.model)
+        }
+
+        return show_bounding_boxes
+      },
+    )
   },
 }
