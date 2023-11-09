@@ -33,32 +33,37 @@ function display_bounding_box(
 }
 
 /** @type {Type.Module} */
-export default {
-  reduce(state, { type, payload }) {
-    if (type === 'SHOW_BOUNDING_BOXES')
-      return {
-        ...state,
-        show_bounding_boxes: payload,
-      }
-    return state
-  },
-  observe({ events, get_state, scene, world, dispatch }) {
-    aiter(on(events, 'STATE_UPDATED')).reduce(
-      (last_show_bounding_boxes, { show_bounding_boxes, entities, player }) => {
-        if (last_show_bounding_boxes !== show_bounding_boxes) {
-          // for all entities
-          for (const entity of entities.values()) {
-            if (entity.type === 'character')
-              display_bounding_box(show_bounding_boxes, entity)
+export default function () {
+  return {
+    reduce(state, { type, payload }) {
+      if (type === 'SHOW_BOUNDING_BOXES')
+        return {
+          ...state,
+          show_bounding_boxes: payload,
+        }
+      return state
+    },
+    observe({ events, get_state, scene, world, dispatch }) {
+      aiter(on(events, 'STATE_UPDATED')).reduce(
+        (
+          last_show_bounding_boxes,
+          { show_bounding_boxes, entities, player },
+        ) => {
+          if (last_show_bounding_boxes !== show_bounding_boxes) {
+            // for all entities
+            for (const entity of entities.values()) {
+              if (entity.type === 'character')
+                display_bounding_box(show_bounding_boxes, entity)
+            }
+
+            // and also for the player
+            if (player.model)
+              display_bounding_box(show_bounding_boxes, player.model)
           }
 
-          // and also for the player
-          if (player.model)
-            display_bounding_box(show_bounding_boxes, player.model)
-        }
-
-        return show_bounding_boxes
-      },
-    )
-  },
+          return show_bounding_boxes
+        },
+      )
+    },
+  }
 }

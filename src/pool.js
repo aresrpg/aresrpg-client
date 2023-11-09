@@ -1,4 +1,5 @@
 import { Box3, Vector3 } from 'three'
+import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 
 import { create_rigid_entity } from './utils/entities'
 import { load_fbx } from './utils/load_model'
@@ -17,24 +18,14 @@ function get_model_size(model) {
 function create_pool(model, type, count, shape) {
   const { height, radius } = get_model_size(model)
   const data = Array.from({ length: count }).map(() => {
-    const clone = model.clone()
-    clone.visible = false
-    return clone
+    const cloned = clone(model)
+    cloned.visible = false
+    return cloned
   })
-
-  setInterval(() => {
-    console.log('visible entity', data.filter(model => model.visible).length)
-    console.log('hidden entity', data.filter(model => !model.visible).length)
-    // log visible entities locations
-    data
-      .filter(model => model.visible)
-      .forEach(model => {
-        console.log('visible position', model.position)
-      })
-  }, 1000)
 
   return {
     get(world) {
+      /** @type {Type.Entity} */
       const model = data.find(model => !model.visible)
 
       if (!model) {
@@ -60,9 +51,8 @@ function create_pool(model, type, count, shape) {
         rigid_body,
         collider,
         move(position) {
-          console.log('moving to', position)
-          model.position.set(position.x, position.y, position.z)
-          move(position)
+          const body_position = move(position)
+          model.position.copy(body_position)
           console.dir({
             model_position: model.position,
             rigid_body_position: rigid_body.translation(),

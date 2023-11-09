@@ -43,6 +43,11 @@ export function create_capsule({
   return capsule
 }
 
+/**
+ *
+ * @param {Object} param0
+ * @param {import("@dimforge/rapier3d").World} param0.world
+ */
 export function create_rigid_entity({
   world,
   height,
@@ -70,6 +75,8 @@ export function create_rigid_entity({
       } else if (type === 'dynamic') {
         rigid_body.setTranslation(position)
       } else throw new Error('Static rigid bodies cannot be moved')
+
+      return rigid_body.translation()
     },
   }
 }

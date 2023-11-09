@@ -26,11 +26,13 @@ function create_light(type, settings) {
 }
 
 /** @type {Type.Module} */
-export default {
-  observe({ events, scene, get_state }) {
-    events.on('packet:LIGHT_ADD', ({ type, ...settings }) => {
-      const light = create_light(type, settings)
-      scene.add(light)
-    })
-  },
+export default function () {
+  return {
+    observe({ events, scene, get_state }) {
+      events.on('packet:LIGHT_ADD', ({ type, ...settings }) => {
+        const light = create_light(type, settings)
+        scene.add(light)
+      })
+    },
+  }
 }
