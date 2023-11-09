@@ -27,10 +27,10 @@ export const PLAYER_ID = 'player'
 /** @typedef {Omit<Readonly<ReturnType<typeof create_context>>, 'actions'>} Context */
 /** @typedef {(state: State, action: Type.Action) => State} Reducer */
 /** @typedef {(context: Context) => void} Observer */
-/** @typedef {{reduce?: Reducer, observe?: Observer }} Module */
+/** @typedef {(state: State, context: Context, delta: number) => void} Ticker */
+/** @typedef {(world: World) => {reduce?: Reducer, observe?: Observer, tick?: Ticker }} Module */
 
 const INITIAL_STATE = {
-  /** @type {Map<string, Type.Entity>} */
   entities: new Map(),
   settings: {
     target_fps: 60,
@@ -70,7 +70,6 @@ const INITIAL_STATE = {
     // represent the supposed position (for updates)
     // the real position is inside the model
     position: new Vector3(),
-    on_ground: false,
   },
 }
 
@@ -107,6 +106,7 @@ function create_context() {
 
   const lock_controls = new PointerLockControls(camera, document.body)
   /** @type {Type.Events} */
+  // @ts-ignore
   const events = new EventEmitter()
   const actions = new PassThrough({ objectMode: true })
   /** @type {() => State} */
@@ -132,7 +132,8 @@ function create_context() {
 
 export default async function create_game() {
   const { actions, ...context } = create_context()
-  const { events, world, scene, renderer, get_state, camera } = context
+  const { events, world, scene, renderer, get_state, camera, lock_controls } =
+    context
 
   scene.background = new Color('#E0E0E0')
   renderer.setPixelRatio(window.devicePixelRatio)
@@ -140,6 +141,8 @@ export default async function create_game() {
   renderer.shadowMap.enabled = true
 
   scene.add(infinite_grid({ world }))
+
+  const modules = GAME_MODULES.map(create => create(world))
 
   const packets = aiter(
     // @ts-ignore
@@ -186,9 +189,11 @@ export default async function create_game() {
   aiter(combine(packets, actions))
     .reduce(
       (last_state, action) => {
-        const state = GAME_MODULES.map(({ reduce }) => reduce)
+        const state = modules
+          .map(({ reduce }) => reduce)
           .filter(Boolean)
           .reduce((intermediate, fn) => {
+            // @ts-ignore
             const result = fn(intermediate, action)
             if (!result) throw new Error(`Reducer ${fn} didn't return a state`)
             return result
@@ -214,7 +219,8 @@ export default async function create_game() {
       console.error(error)
     })
 
-  GAME_MODULES.map(({ observe }) => observe)
+  modules
+    .map(({ observe }) => observe)
     .filter(Boolean)
     .forEach(observe => observe(context))
 
@@ -229,8 +235,15 @@ export default async function create_game() {
 
       if (delta >= frame_duration) {
         const state = get_state()
-        events.emit('FRAME', { state, delta })
+
+        modules
+          .map(({ tick }) => tick)
+          .filter(Boolean)
+          .filter(() => state != null && lock_controls.isLocked)
+          .forEach(tick => tick(state, context, delta))
+
         world.step()
+        renderer.render(scene, camera)
         last_frame_time = current_time - (delta % frame_duration)
 
         const updated_fps = state?.settings?.target_fps
