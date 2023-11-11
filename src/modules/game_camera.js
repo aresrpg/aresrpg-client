@@ -8,12 +8,12 @@ import { combine, named_on } from '../utils/iterator.js'
 
 const CAMERA_MIN_POLAR_ANGLE = 0
 const CAMERA_MAX_POLAR_ANGLE = Math.PI * 0.5 * 0.7 //  70% of the half PI
-const CAMERA_MIN_ZOOM = 3.5
+const CAMERA_MIN_ZOOM = 4
 const CAMERA_MAX_ZOOM = 15
 
 /** @type {import("../game").Module} */
 export default function () {
-  const camera_rotation = new Vector3()
+  const camera_rotation = new Vector3(0.8, 0, 0)
   let spherical_radius = 10
 
   return {
@@ -37,44 +37,49 @@ export default function () {
 
       // Look at the player
       camera.lookAt(
-        new Vector3(model.position.x, model.position.y + 2, model.position.z),
+        new Vector3(model.position.x, model.position.y, model.position.z),
       )
     },
-    observe({
-      camera,
-      lock_controls,
-      events,
-      get_state,
-      renderer,
-      scene,
-      world,
-    }) {
-      camera.position.set(0, 5, 10)
+    observe({ camera, events, get_state, renderer, scene, world }) {
+      camera.position.set(0, 5, 0)
+
+      let is_dragging = false
+
+      window.addEventListener('mousedown', () => {
+        is_dragging = true
+        document.body.style.cursor = 'none'
+      })
+
+      window.addEventListener('mouseup', () => {
+        is_dragging = false
+        document.body.style.cursor = 'default'
+      })
 
       aiter(on(window, 'mousemove'))
-        .filter(() => lock_controls.isLocked)
+        .filter(() => is_dragging)
         .forEach(({ movementX, movementY }) => {
-          const {
-            settings: { mouse_sensitivity },
-          } = get_state()
+          const state = get_state()
+          if (state) {
+            const {
+              settings: { mouse_sensitivity },
+            } = state
 
-          camera_rotation.y -= movementX * mouse_sensitivity
-          camera_rotation.x += movementY * mouse_sensitivity
-          camera_rotation.x = Math.max(
-            CAMERA_MIN_POLAR_ANGLE,
-            Math.min(CAMERA_MAX_POLAR_ANGLE, camera_rotation.x),
-          )
+            camera_rotation.y -= movementX * mouse_sensitivity
+            camera_rotation.x += movementY * mouse_sensitivity
+            camera_rotation.x = Math.max(
+              CAMERA_MIN_POLAR_ANGLE,
+              Math.min(CAMERA_MAX_POLAR_ANGLE, camera_rotation.x),
+            )
+          }
         })
 
-      aiter(on(window, 'wheel'))
-        .filter(() => lock_controls.isLocked)
-        .forEach(({ deltaY }) => {
-          spherical_radius += deltaY * 0.05
-          spherical_radius = Math.max(
-            CAMERA_MIN_ZOOM,
-            Math.min(CAMERA_MAX_ZOOM, spherical_radius),
-          )
-        })
+      aiter(on(window, 'wheel')).forEach(({ deltaY }) => {
+        spherical_radius += deltaY * 0.05
+        spherical_radius = Math.max(
+          CAMERA_MIN_ZOOM,
+          Math.min(CAMERA_MAX_ZOOM, spherical_radius),
+        )
+      })
     },
   }
 }

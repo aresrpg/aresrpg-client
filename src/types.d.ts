@@ -29,23 +29,30 @@ interface TypedEmitter<T extends EventMap> {
   removeAllListeners(): this
 }
 
+declare module 'stream' {
+  class PassThrough {
+    constructor(options?: any)
+    write(chunk: any): void
+  }
+}
+
 declare module 'events' {
   interface StaticEventEmitterOptions {
     signal?: AbortSignal | undefined
   }
 
   function on(
-    emitter: NodeJS.EventEmitter,
+    emitter: NodeJS.EventEmitter | EventTarget,
     eventName: string,
     options?: StaticEventEmitterOptions,
   ): AsyncIterableIterator<any>
   function on<T, K extends EventName<T>>(
-    emitter: TypedEmitter<T>,
+    emitter: TypedEmitter<T> | EventTarget,
     eventName: K,
     options?: StaticEventEmitterOptions,
   ): AsyncIterableIterator<[T[K]]>
   function on<T>(
-    emitter: TypedEmitter<T>,
+    emitter: TypedEmitter<T> | EventTarget,
     eventName: string,
     options?: StaticEventEmitterOptions,
   ): AsyncIterableIterator<any>
@@ -92,7 +99,7 @@ declare namespace Type {
     'packet:ENTITY_MOVE': { id: string; position: [number, number, number] }
   }
 
-  type Entity = import('three').Group<import('three').Object3D>
+  type Entity = import('three').Group<import('three').Object3DEventMap>
 
   // Distributed actions which can be dispatched and then reduced
   type Actions = {

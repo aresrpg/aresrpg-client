@@ -1,3 +1,4 @@
+// @ts-ignore
 export class WebSocketStream extends ReadableStream {
   constructor(url) {
     let socket
@@ -48,6 +49,7 @@ export class WebSocketStream extends ReadableStream {
   }
 }
 
+// @ts-ignore
 export class ObjectArrayStream extends ReadableStream {
   constructor(dataArray) {
     super({
