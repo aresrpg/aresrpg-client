@@ -114,6 +114,7 @@ declare namespace Type {
     KEYDOWN: string
     KEYUP: string
     PLAYER_MOVED: import('three').Vector3
+    CAMERA_ROTATED: import('three').Vector3
   } & Packets
 
   type Events = TypedEmitter<
