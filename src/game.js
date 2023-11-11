@@ -45,8 +45,9 @@ export const INITIAL_STATE = {
       ['KeyA', 'left'],
       ['KeyD', 'right'],
       ['Space', 'jump'],
+      ['KeyF', 'dance'],
     ]),
-    show_bounding_boxes: true,
+    show_bounding_boxes: false,
   },
 
   inputs: {
@@ -79,6 +80,16 @@ export const INITIAL_STATE = {
     },
     feet_position() {
       return new Vector3()
+    },
+    animations: {
+      mixer: null,
+      IDLE: null,
+      RUN: null,
+      RUN_BACKWARDS: null,
+      DANCE: null,
+      JUMP: null,
+      STRAFE_LEFT: null,
+      STRAFE_RIGHT: null,
     },
   },
 }
@@ -142,10 +153,6 @@ export default async function create_game() {
   const { actions, ...context } = create_context()
   const { events, world, scene, renderer, get_state, camera, dispatch } =
     context
-
-  setTimeout(() => {
-    dispatch('SHOW_BOUNDING_BOXES', true)
-  }, 2000)
 
   scene.background = new Color('#E0E0E0')
   renderer.setPixelRatio(window.devicePixelRatio)

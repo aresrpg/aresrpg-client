@@ -9,7 +9,7 @@ import {
 import { CoefficientCombineRule, ColliderDesc } from '@dimforge/rapier3d'
 
 import Pool from '../pool.js'
-import { PLAYER_ID } from '../game.js'
+import { INITIAL_STATE, PLAYER_ID } from '../game.js'
 import { create_capsule, create_rigid_entity } from '../utils/entities.js'
 
 function rigid_body_vector(rigid_body) {
@@ -64,7 +64,8 @@ export default function () {
         }
 
         if (type === 'character') {
-          const model = Pool.guard.get(world, scene)
+          const { model, mixer, ...animations } = Pool.guard.get(world, scene)
+
           if (!model) return
 
           const { height, radius } = get_model_size(model)
@@ -80,12 +81,13 @@ export default function () {
             wireframe: true,
           })
 
-          // capsule.scale.divideScalar(scale)
-          // capsule.position.add(new Vector3(0, height / scale, 0))
-
           const entity = {
             ...base_entity,
             model,
+            animations: {
+              mixer,
+              ...animations,
+            },
             rigid_body,
             collider,
             move,
@@ -112,6 +114,9 @@ export default function () {
 
           scene.add(bounding_box)
           scene.add(entity.model)
+
+          bounding_box.visible = INITIAL_STATE.settings.show_bounding_boxes
+
           dispatch('ENTITY_ADD', entity)
         }
 
@@ -119,13 +124,20 @@ export default function () {
           const height = 1
           const radius = 0.5
           const body_type = 'dynamic'
-          const bounding_box = create_capsule({
+          const capsule = create_capsule({
             height,
             radius,
             color: '#1565C0',
           })
 
-          bounding_box.castShadow = true
+          const bounding_box = create_capsule({
+            height,
+            radius: radius + 0.05,
+            color: '#FBC02D',
+            wireframe: true,
+          })
+
+          capsule.castShadow = true
 
           const { rigid_body, collider, move } = create_rigid_entity({
             world,
@@ -139,7 +151,7 @@ export default function () {
 
           const entity = {
             ...base_entity,
-            model: bounding_box,
+            model: capsule,
             rigid_body,
             body_type,
             collider,
@@ -150,11 +162,17 @@ export default function () {
             update_mesh_position() {
               const position = entity.body_position()
               const rotation = rigid_body.rotation()
-
-              bounding_box.position.copy(position)
-              bounding_box.setRotationFromQuaternion(
-                new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w),
+              const quaternion = new Quaternion(
+                rotation.x,
+                rotation.y,
+                rotation.z,
+                rotation.w,
               )
+
+              capsule.position.copy(position)
+              capsule.setRotationFromQuaternion(quaternion)
+              bounding_box.position.copy(position)
+              bounding_box.setRotationFromQuaternion(quaternion)
             },
             body_position() {
               return rigid_body_vector(rigid_body)
@@ -164,6 +182,10 @@ export default function () {
           entity.move(base_entity.position)
           entity.update_mesh_position()
           scene.add(entity.model)
+          scene.add(bounding_box)
+
+          bounding_box.visible = INITIAL_STATE.settings.show_bounding_boxes
+
           dispatch('ENTITY_ADD', entity)
         }
       })
