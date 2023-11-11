@@ -47,12 +47,12 @@ export default function () {
 
       window.addEventListener('mousedown', () => {
         is_dragging = true
-        document.body.style.cursor = 'none'
+        document.body.requestPointerLock()
       })
 
       window.addEventListener('mouseup', () => {
         is_dragging = false
-        document.body.style.cursor = 'default'
+        document.exitPointerLock()
       })
 
       aiter(on(window, 'mousemove'))

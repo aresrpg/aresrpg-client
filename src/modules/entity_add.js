@@ -22,7 +22,7 @@ function get_model_size(model, scale = 0.01) {
   const size = bbox.getSize(new Vector3())
   const center = bbox.getCenter(new Vector3())
 
-  const height = size.y / scale
+  const height = size.y / scale / 2
   const radius = size.z + size.x / scale / 2 / 2
 
   console.log('height', height, 'radius', radius)
@@ -97,7 +97,7 @@ export default function () {
             },
             update_mesh_position() {
               const position = rigid_body_vector(rigid_body)
-              model.position.copy(position)
+              model.position.copy(position).sub(new Vector3(0, height, 0))
               bounding_box.position.copy(position)
             },
             remove() {
@@ -149,7 +149,7 @@ export default function () {
             },
             update_mesh_position() {
               const position = entity.body_position()
-              const rotation = entity.body_rotation()
+              const rotation = rigid_body.rotation()
 
               bounding_box.position.copy(position)
               bounding_box.setRotationFromQuaternion(
@@ -158,9 +158,6 @@ export default function () {
             },
             body_position() {
               return rigid_body_vector(rigid_body)
-            },
-            body_rotation() {
-              return rigid_body.rotation()
             },
           }
 
