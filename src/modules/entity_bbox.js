@@ -1,36 +1,9 @@
 import { on } from 'events'
 
-import { Vector3 } from 'three'
+import { Box3, Vector3 } from 'three'
 import { aiter } from 'iterator-helper'
 
 import { create_capsule } from '../utils/entities.js'
-
-const BBOX_NAME = 'ares:bounding_box'
-
-function display_bounding_box(
-  show,
-  { physics, model, height, radius, position },
-) {
-  if (show) {
-    const capsule = create_capsule({
-      height,
-      radius,
-      position,
-      color: '#EF5350',
-      wireframe: true,
-    })
-
-    capsule.name = BBOX_NAME
-
-    model.add(capsule)
-  } else {
-    const capsule = model.getObjectByName(BBOX_NAME)
-
-    model.remove(capsule)
-    capsule.geometry.dispose()
-    capsule.material.dispose()
-  }
-}
 
 /** @type {Type.Module} */
 export default function () {
@@ -43,7 +16,7 @@ export default function () {
         }
       return state
     },
-    observe({ events, get_state, scene, world, dispatch }) {
+    observe({ events, get_state, world, dispatch }) {
       aiter(on(events, 'STATE_UPDATED')).reduce(
         (
           last_show_bounding_boxes,
@@ -51,14 +24,11 @@ export default function () {
         ) => {
           if (last_show_bounding_boxes !== show_bounding_boxes) {
             // for all entities
-            for (const entity of entities.values()) {
-              if (entity.type === 'character')
-                display_bounding_box(show_bounding_boxes, entity)
-            }
+            for (const entity of entities.values())
+              entity.show_bounding_box(show_bounding_boxes)
 
             // and also for the player
-            if (player.model)
-              display_bounding_box(show_bounding_boxes, player.model)
+            if (player.model) player.show_bounding_box(show_bounding_boxes)
           }
 
           return show_bounding_boxes
