@@ -10,8 +10,6 @@ import {
 } from 'three'
 import { ColliderDesc, RigidBodyDesc } from '@dimforge/rapier3d'
 
-import { load_fbx } from './load_model'
-
 export function create_capsule({
   height,
   radius,
@@ -25,7 +23,7 @@ export function create_capsule({
   const Material = wireframe ? MeshBasicMaterial : MeshLambertMaterial
 
   // Create a cylinder geometry with the calculated dimensions
-  const geometry = new CapsuleGeometry(radius, height, 10, 10)
+  const geometry = new CapsuleGeometry(radius, height, wireframe ? 1 : 10, 10)
   const material = new Material({
     color: new Color(color),
     wireframe, // Wireframe to see through

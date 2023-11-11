@@ -8,13 +8,14 @@ import { lerp } from 'three/src/math/MathUtils.js'
 import { GRAVITY, PLAYER_ID } from '../game.js'
 
 const SPEED = 0.1
-const JUMP_FORCE = 20
+const JUMP_FORCE = 15
 const CONTROLLER_OFFSET = 0.01
 
-const ASCENT_GRAVITY_FACTOR = 5
+const ASCENT_GRAVITY_FACTOR = 4
 const APEX_GRAVITY_FACTOR = 0.3
 const DESCENT_GRAVITY_FACTOR = 7
 const JUMP_FORWARD_IMPULSE = 5
+const JUMP_COOLDWON = 0.1 // one jump every 100ms
 
 const jump_states = {
   ASCENT: 'ASCENT',
@@ -40,6 +41,13 @@ function handle_entity_positions({ entities, last_positions }) {
   }
 }
 
+function fade_to_animation(from, to, duration) {
+  if (from !== to) {
+    from.fadeOut(duration)
+    to.reset().fadeIn(duration).play()
+  }
+}
+
 /** @type {Type.Module} */
 export default function ({ world }) {
   const last_positions = new WeakMap()
@@ -55,11 +63,12 @@ export default function ({ world }) {
   let last_corrected_movement = new Vector3()
   let jump_state = jump_states.NONE
   let jump_cooldown = 0
+  let current_animation = null
 
   return {
     tick({ player, entities, inputs }, { world, camera }, delta) {
       const delta_seconds = delta / 1000
-      const { rigid_body, collider } = player
+      const { rigid_body, collider, animations } = player
       const camera_forward = new Vector3(0, 0, -1)
         .applyQuaternion(camera.quaternion)
         .setY(0)
@@ -68,6 +77,11 @@ export default function ({ world }) {
         .applyQuaternion(camera.quaternion)
         .setY(0)
         .normalize()
+
+      if (!current_animation) {
+        current_animation = animations.IDLE
+        current_animation.play()
+      }
 
       // handle movements of entities when their position changes
       handle_entity_positions({ entities, last_positions })
@@ -121,7 +135,7 @@ export default function ({ world }) {
           velocity.z += forward_impulse.z
 
           jump_state = jump_states.ASCENT
-          jump_cooldown = 0.1 // one jump every 100ms
+          jump_cooldown = JUMP_COOLDWON
         } else {
           jump_state = jump_states.NONE
 
@@ -163,12 +177,14 @@ export default function ({ world }) {
       movement.z += velocity.z * delta_seconds
 
       controller.computeColliderMovement(collider, movement)
+
       const { x, y, z } = controller.computedMovement()
       const corrected_movement = new Vector3(x, y, z)
+      const is_moving = !!corrected_movement.lengthSq()
 
-      if (movement.lengthSq() > 0.01) {
+      if (corrected_movement.lengthSq()) {
         // Use lengthSq for efficiency, as we're only checking for non-zero length
-        const flat_movement = movement.clone().setY(0).normalize()
+        const flat_movement = corrected_movement.clone().setY(0).normalize()
 
         // Calculate the target quaternion: this rotates modelForward to align with flatMovement
         const quaternion = new Quaternion().setFromUnitVectors(
@@ -176,7 +192,25 @@ export default function ({ world }) {
           flat_movement,
         )
         player.model.quaternion.slerp(quaternion, 0.2)
-        console.log('set quaternion', movement.lengthSq())
+      }
+
+      if (on_ground) {
+        if (is_moving && !current_animation !== animations.RUN) {
+          console.log('fade to run')
+          fade_to_animation(current_animation, animations.RUN, 0.5)
+          current_animation = animations.RUN
+        } else if (!is_moving && !current_animation !== animations.IDLE) {
+          console.log('fade to idle')
+          fade_to_animation(current_animation, animations.IDLE, 0.5)
+          current_animation = animations.IDLE
+        }
+      } else if (
+        jump_state !== jump_states.NONE &&
+        !current_animation !== animations.JUMP
+      ) {
+        console.log('fade to jump')
+        fade_to_animation(current_animation, animations.JUMP, 0)
+        current_animation = animations.JUMP
       }
 
       // Move the player if there's a change in position
@@ -190,6 +224,7 @@ export default function ({ world }) {
         player.update_mesh_position()
       }
 
+      animations.mixer.update(delta_seconds)
       last_corrected_movement = corrected_movement
     },
     reduce(state, { type, payload }) {

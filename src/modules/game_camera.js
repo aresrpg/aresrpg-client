@@ -45,14 +45,15 @@ export default function () {
 
       let is_dragging = false
 
-      window.addEventListener('mousedown', () => {
+      renderer.domElement.addEventListener('mousedown', () => {
         is_dragging = true
-        document.body.requestPointerLock()
+        renderer.domElement.requestPointerLock()
       })
 
       window.addEventListener('mouseup', () => {
         is_dragging = false
-        document.exitPointerLock()
+        if (document.pointerLockElement === renderer.domElement)
+          document.exitPointerLock()
       })
 
       aiter(on(window, 'mousemove'))
