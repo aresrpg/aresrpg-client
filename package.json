@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint . && prettier . --check && npm run typecheck",
     "typecheck": "tsc --build",
-    "format": "prettier . --write && eslint . --fix"
+    "format": "prettier . --write && eslint . --fix",
+    "postversion": "git push --follow-tags"
   },
   "dependencies": {
     "@dimforge/rapier3d": "^0.11.2",
