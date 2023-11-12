@@ -17,7 +17,7 @@ export default function () {
   let spherical_radius = 10
 
   return {
-    tick({ player: { model } }, { camera }) {
+    tick({ player: { model, height } }, { camera }) {
       // Calculate the offset position from the player using spherical coordinates
       const offset_x =
         Math.sin(camera_rotation.y) *
@@ -37,7 +37,11 @@ export default function () {
 
       // Look at the player
       camera.lookAt(
-        new Vector3(model.position.x, model.position.y, model.position.z),
+        new Vector3(
+          model.position.x,
+          model.position.y + height / 2,
+          model.position.z,
+        ),
       )
     },
     observe({ camera, events, get_state, renderer, scene, world }) {

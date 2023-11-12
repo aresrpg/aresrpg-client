@@ -21,6 +21,7 @@ const Models = {
     STRAFE_RIGHT: await load_fbx_animation(
       'src/animations/guard_strafe_right.fbx',
     ),
+    LAND: await load_fbx_animation('src/animations/guard_land.fbx'),
   },
 }
 
@@ -32,7 +33,8 @@ function create_pool({ model, ...animations }, count) {
   })
 
   return {
-    get(world, scene) {
+    /** @type {() => ({ model: Type.Entity, mixer: AnimationMixer, [clip: string]: import("three").AnimationAction })} */
+    get() {
       const model_instance = data.find(object => !object.visible)
 
       if (!model_instance) {

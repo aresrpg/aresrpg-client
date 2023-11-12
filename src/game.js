@@ -19,6 +19,7 @@ import entity_bbox from './modules/entity_bbox.js'
 import player_inputs from './modules/player_inputs.js'
 import entity_movement from './modules/entity_movement.js'
 import ui_settings from './modules/ui_settings.js'
+import player_settings from './modules/player_settings.js'
 
 export const GRAVITY = 9.81
 export const PLAYER_ID = 'player'
@@ -37,6 +38,7 @@ export const INITIAL_STATE = {
   entities: new Map(),
   settings: {
     target_fps: 60,
+    game_speed: 1,
     mouse_sensitivity: 0.005,
     ui_fps_enabled: true,
     keymap: new Map([
@@ -56,6 +58,7 @@ export const INITIAL_STATE = {
     left: false,
     right: false,
     jump: false,
+    dance: false,
   },
 
   player: {
@@ -102,6 +105,7 @@ const GAME_MODULES = [
   entity_bbox,
   entity_movement,
   player_inputs,
+  player_settings,
   game_lights,
   game_camera,
 ]
@@ -250,11 +254,12 @@ export default async function create_game() {
   function animation() {
     let frame_duration = 1000 / INITIAL_STATE.settings.target_fps
     let last_frame_time = performance.now()
+    let { game_speed } = INITIAL_STATE.settings
 
     return function animate(current_time) {
       requestAnimationFrame(animate)
 
-      const delta = current_time - last_frame_time
+      const delta = (current_time - last_frame_time) * game_speed
 
       if (delta >= frame_duration) {
         const state = get_state()
@@ -269,7 +274,8 @@ export default async function create_game() {
 
         renderer.render(scene, camera)
 
-        last_frame_time = current_time - (delta % frame_duration)
+        last_frame_time =
+          current_time - ((current_time - last_frame_time) % frame_duration)
 
         const updated_fps = state?.settings?.target_fps
         if (
@@ -277,6 +283,9 @@ export default async function create_game() {
           updated_fps !== INITIAL_STATE.settings.target_fps
         )
           frame_duration = 1000 / state.settings.target_fps
+        const udpated_game_speed = state?.settings?.game_speed
+        if (udpated_game_speed != null && udpated_game_speed !== game_speed)
+          game_speed = udpated_game_speed
       }
     }
   }

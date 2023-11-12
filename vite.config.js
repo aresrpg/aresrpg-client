@@ -11,6 +11,9 @@ export default defineConfig({
       events: 'events-polyfill',
     },
   },
+  build: {
+    target: 'esnext',
+  },
   plugins: [
     wasm(),
     vue(),

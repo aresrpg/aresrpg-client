@@ -1,5 +1,6 @@
 import {
   Box3,
+  LoopOnce,
   Mesh,
   MeshStandardMaterial,
   Quaternion,
@@ -64,7 +65,7 @@ export default function () {
         }
 
         if (type === 'character') {
-          const { model, mixer, ...animations } = Pool.guard.get(world, scene)
+          const { model, mixer, ...animations } = Pool.guard.get()
 
           if (!model) return
 
@@ -80,6 +81,8 @@ export default function () {
             color: '#FBC02D',
             wireframe: true,
           })
+
+          animations.JUMP.setLoop(LoopOnce, 0)
 
           const entity = {
             ...base_entity,
