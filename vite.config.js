@@ -65,10 +65,11 @@ export default defineConfig({
         ],
       },
       manifest: {
-        name: '',
-        short_name: '',
-        description: 'lorem ipsum..',
-        theme_color: '#ffffff',
+        name: 'AresRPG.world',
+        short_name: 'AresRPG',
+        description:
+          'Start your adventure right now and join thousands of players in an immersive fantastic world ! Fight for your life and become the strongest warrior.',
+        theme_color: '#212121',
         icons: [
           {
             src: 'android-chrome-192x192.png',
