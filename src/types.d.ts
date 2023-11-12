@@ -104,6 +104,7 @@ declare namespace Type {
   // Distributed actions which can be dispatched and then reduced
   type Actions = {
     SHOW_FPS: boolean
+    TARGET_FPS: number
     ENTITY_ADD: {
       id: string
       type: string

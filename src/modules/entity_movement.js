@@ -8,13 +8,13 @@ import { lerp } from 'three/src/math/MathUtils.js'
 import { GRAVITY, PLAYER_ID } from '../game.js'
 
 const SPEED = 0.1
-const JUMP_FORCE = 15
+const JUMP_FORCE = 13
 const CONTROLLER_OFFSET = 0.01
 
-const ASCENT_GRAVITY_FACTOR = 4
+const ASCENT_GRAVITY_FACTOR = 3
 const APEX_GRAVITY_FACTOR = 0.3
-const DESCENT_GRAVITY_FACTOR = 7
-const JUMP_FORWARD_IMPULSE = 5
+const DESCENT_GRAVITY_FACTOR = 5
+const JUMP_FORWARD_IMPULSE = 3
 const JUMP_COOLDWON = 0.1 // one jump every 100ms
 
 const jump_states = {
@@ -180,9 +180,12 @@ export default function ({ world }) {
 
       const { x, y, z } = controller.computedMovement()
       const corrected_movement = new Vector3(x, y, z)
-      const is_moving = !!corrected_movement.lengthSq()
+      const is_moving_horizontally = !!corrected_movement
+        .clone()
+        .setY(0)
+        .lengthSq()
 
-      if (corrected_movement.lengthSq()) {
+      if (is_moving_horizontally) {
         // Use lengthSq for efficiency, as we're only checking for non-zero length
         const flat_movement = corrected_movement.clone().setY(0).normalize()
 
@@ -195,22 +198,41 @@ export default function ({ world }) {
       }
 
       if (on_ground) {
-        if (is_moving && !current_animation !== animations.RUN) {
-          console.log('fade to run')
-          fade_to_animation(current_animation, animations.RUN, 0.5)
+        if (is_moving_horizontally && current_animation !== animations.RUN) {
+          fade_to_animation(current_animation, animations.RUN, 0.3)
           current_animation = animations.RUN
-        } else if (!is_moving && !current_animation !== animations.IDLE) {
-          console.log('fade to idle')
-          fade_to_animation(current_animation, animations.IDLE, 0.5)
+        } else if (
+          !is_moving_horizontally &&
+          current_animation !== animations.IDLE &&
+          current_animation !== animations.DANCE
+        ) {
+          fade_to_animation(current_animation, animations.IDLE, 0.3)
           current_animation = animations.IDLE
         }
       } else if (
-        jump_state !== jump_states.NONE &&
-        !current_animation !== animations.JUMP
+        jump_state === jump_states.ASCENT &&
+        current_animation !== animations.JUMP
       ) {
-        console.log('fade to jump')
         fade_to_animation(current_animation, animations.JUMP, 0)
         current_animation = animations.JUMP
+      } else if (
+        (jump_state === jump_states.APEX ||
+          jump_state === jump_states.DESCENT) &&
+        current_animation !== animations.FALLING
+      ) {
+        fade_to_animation(current_animation, animations.FALLING, 0.3)
+        current_animation = animations.FALLING
+      } else if (
+        current_animation !== animations.FALLING &&
+        current_animation !== animations.JUMP
+      ) {
+        fade_to_animation(current_animation, animations.FALLING, 0.5)
+        current_animation = animations.FALLING
+      }
+
+      if (on_ground && inputs.dance && current_animation !== animations.DANCE) {
+        fade_to_animation(current_animation, animations.DANCE, 0.3)
+        current_animation = animations.DANCE
       }
 
       // Move the player if there's a change in position
