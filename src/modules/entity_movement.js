@@ -13,7 +13,7 @@ import step5 from '../assets/step5.ogg'
 import step6 from '../assets/step6.ogg'
 import { GRAVITY, PLAYER_ID } from '../game.js'
 
-const SPEED = 0.15
+const SPEED = 0.13
 const JUMP_FORCE = 13
 const CONTROLLER_OFFSET = 0.01
 
@@ -55,7 +55,7 @@ const play_step_sound = throttle(() => {
   const step_audio = random_element(step_audios)
   step_audio.currentTime = 0
   step_audio.play()
-}, 270)
+}, 310)
 
 // last_positions are the latest state of positions the server or client wanted to enforce
 // if the last wanted position becomes outdated, the entity will be moved to the latest position
