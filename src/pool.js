@@ -3,12 +3,12 @@ import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { ColliderDesc } from '@dimforge/rapier3d'
 
 import { load_fbx_animation, load_fbx_model } from './utils/load_model'
-import guard_fbx from './models/guard.fbx'
-import guard_idle_fbx from './animations/guard_idle.fbx'
-import guard_run_fbx from './animations/guard_run.fbx'
-import guard_dance_fbx from './animations/guard_dance.fbx'
-import guard_jump_fbx from './animations/guard_jump.fbx'
-import guard_falling_fbx from './animations/guard_falling.fbx'
+import guard_fbx from './models/guard.fbx?url'
+import guard_idle_fbx from './animations/guard_idle.fbx?url'
+import guard_run_fbx from './animations/guard_run.fbx?url'
+import guard_dance_fbx from './animations/guard_dance.fbx?url'
+import guard_jump_fbx from './animations/guard_jump.fbx?url'
+import guard_falling_fbx from './animations/guard_falling.fbx?url'
 
 const Models = {
   guard: {
