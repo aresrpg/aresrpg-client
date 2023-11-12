@@ -1,31 +1,49 @@
 <template lang="pug">
-.aresrpg(v-if="webgl_available")
-  .canvas(ref='renderer_container')
-.no_webgl(v-else) It seems WebGL is not available in your browser, please use a descent one 😀
+Suspense(v-if="show_game")
+  Game
+.blank(v-else)
+  h1 Nothing to see here 👀
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
-import WebGL from 'three/addons/capabilities/WebGL.js'
+import { ref, onMounted } from 'vue'
+import konamiCode from '@sidp/konami-code'
 
-import create_game from './game.js'
+import konami_1 from './assets/konami_1.wav'
+import konami_2 from './assets/konami_2.wav'
+import konami_3 from './assets/konami_3.wav'
+import konami_ok from './assets/konami_ok.wav'
+import Game from './game.vue'
+import { VITE_KONAMI } from './env'
 
 const name = 'app'
+const show_game = ref(!VITE_KONAMI)
+const konami_sounds = [konami_1, konami_2, konami_3]
+const allowed_keys = [37, 38, 39, 40, 66, 65]
 
-const renderer_container = ref(null)
-const webgl_available = ref(true)
-const game = create_game()
+const play_konami_sound = event => {
+  if (!allowed_keys.includes(event?.keyCode)) return
+  const random_index = Math.floor(Math.random() * konami_sounds.length)
+  const random_sound = konami_sounds[random_index]
+  new Audio(random_sound).play()
+}
 
-onMounted(async () => {
-  const { start } = await game
-  if (WebGL.isWebGLAvailable()) start(renderer_container.value)
-  else webgl_available.value = false
-})
+const play_konami_ok = () => {
+  new Audio(konami_ok).play()
+}
 
-onUnmounted(async () => {
-  const { stop } = await game
-  stop()
-})
+if (VITE_KONAMI) {
+  konamiCode(function () {
+    show_game.value = true
+    play_konami_ok()
+    window.removeEventListener('keydown', play_konami_sound)
+    this.remove()
+  })
+
+  onMounted(() => {
+    window.addEventListener('keydown', play_konami_sound)
+  })
+}
 </script>
 
 <style lang="stylus">
@@ -66,14 +84,12 @@ sc-disableScollBar()
       color #e1c79b
       fill #e1c79b
 
-.aresrpg
+.blank
   width 100vw
   height 100vh
-
-.no_webgl
+  color #EEEEEE
+  text-shadow 1px 2px 3px black
   display flex
   justify-content center
   align-items center
-  height 100vh
-  color #e1c79b
 </style>

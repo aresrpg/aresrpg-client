@@ -81,9 +81,6 @@ export const INITIAL_STATE = {
     body_position() {
       return new Vector3()
     },
-    feet_position() {
-      return new Vector3()
-    },
     animations: {
       mixer: null,
       IDLE: null,
@@ -291,6 +288,7 @@ export default async function create_game() {
   }
 
   return {
+    events,
     start(container) {
       container.appendChild(renderer.domElement)
       animation()(performance.now())

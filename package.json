@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@dimforge/rapier3d": "^0.11.2",
+    "@sidp/konami-code": "^1.0.1",
     "fast-merge-async-iterators": "^1.0.7",
     "iterator-helper": "^1.3.4",
     "lil-gui": "^0.19.1",

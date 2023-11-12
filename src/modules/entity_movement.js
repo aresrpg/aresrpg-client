@@ -5,9 +5,15 @@ import { Quaternion, Vector3 } from 'three'
 import { Ray } from '@dimforge/rapier3d'
 import { lerp } from 'three/src/math/MathUtils.js'
 
+import step1 from '../assets/step1.ogg'
+import step2 from '../assets/step2.ogg'
+import step3 from '../assets/step3.ogg'
+import step4 from '../assets/step4.ogg'
+import step5 from '../assets/step5.ogg'
+import step6 from '../assets/step6.ogg'
 import { GRAVITY, PLAYER_ID } from '../game.js'
 
-const SPEED = 0.1
+const SPEED = 0.15
 const JUMP_FORCE = 13
 const CONTROLLER_OFFSET = 0.01
 
@@ -23,6 +29,33 @@ const jump_states = {
   DESCENT: 'DESCENT',
   NONE: 'NONE',
 }
+
+const throttle = (action, interval) => {
+  let last_time = 0
+  return (...args) => {
+    const now = Date.now()
+    if (now - last_time >= interval) {
+      last_time = now
+      action(...args)
+    }
+  }
+}
+
+const step_audios = [
+  new Audio(step1),
+  new Audio(step2),
+  new Audio(step3),
+  new Audio(step4),
+  new Audio(step5),
+  new Audio(step6),
+]
+
+const random_element = arr => arr[Math.floor(Math.random() * arr.length)]
+const play_step_sound = throttle(() => {
+  const step_audio = random_element(step_audios)
+  step_audio.currentTime = 0
+  step_audio.play()
+}, 270)
 
 // last_positions are the latest state of positions the server or client wanted to enforce
 // if the last wanted position becomes outdated, the entity will be moved to the latest position
@@ -66,7 +99,7 @@ export default function ({ world }) {
   let current_animation = null
 
   return {
-    tick({ player, entities, inputs }, { world, camera }, delta) {
+    tick({ player, entities, inputs }, { world, camera, dispatch }, delta) {
       const delta_seconds = delta / 1000
       const { rigid_body, collider, animations } = player
       const camera_forward = new Vector3(0, 0, -1)
@@ -235,15 +268,19 @@ export default function ({ world }) {
         current_animation = animations.DANCE
       }
 
+      if (current_animation === animations.RUN) play_step_sound()
+
       // Move the player if there's a change in position
       if (!corrected_movement.equals(last_corrected_movement)) {
-        player.move({
-          x: position.x + corrected_movement.x,
-          y: position.y + corrected_movement.y,
-          z: position.z + corrected_movement.z,
-        })
+        const new_position = new Vector3(
+          position.x + corrected_movement.x,
+          position.y + corrected_movement.y,
+          position.z + corrected_movement.z,
+        )
+        player.move(new_position)
 
         player.update_mesh_position()
+        dispatch('PLAYER_MOVED', new_position)
       }
 
       animations.mixer.update(delta_seconds)
