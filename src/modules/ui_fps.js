@@ -11,12 +11,12 @@ export default function () {
       stats?.update()
     },
     reduce(state, { type, payload }) {
-      if (type === 'SHOW_FPS')
+      if (type === 'update:show_fps')
         return {
           ...state,
           settings: {
             ...state.settings,
-            ui_fps_enabled: payload,
+            show_fps: payload,
           },
         }
 
@@ -35,11 +35,11 @@ export default function () {
       }
 
       aiter(on(events, 'STATE_UPDATED'))
-        .map(({ settings: { ui_fps_enabled } }) => ui_fps_enabled)
-        .reduce(({ last_ui_fps_enabled }, ui_fps_enabled) => {
-          if (ui_fps_enabled !== last_ui_fps_enabled) show_stats(ui_fps_enabled)
+        .map(({ settings: { show_fps } }) => show_fps)
+        .reduce(({ last_show_fps }, show_fps) => {
+          if (show_fps !== last_show_fps) show_stats(show_fps)
 
-          return { last_ui_fps_enabled: ui_fps_enabled }
+          return { last_show_fps: show_fps }
         })
     },
   }

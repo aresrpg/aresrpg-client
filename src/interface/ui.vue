@@ -1,31 +1,27 @@
 <script setup>
 import { onMounted, onUnmounted, inject, reactive } from 'vue'
 
+import { PLAYER_ID } from '../game.js'
+import World from '../world.js'
 import pkg from '../../package.json'
 
 const game = inject('game')
-const player_location = reactive({ x: 0, y: 0, z: 0 })
+const player_chunk_position = reactive({ x: 0, z: 0 })
 
-const on_state_update = state => {
-  const { position } = state.player
-
-  const x = Math.floor(position.x)
-  const y = Math.floor(position.y)
-  const z = Math.floor(position.z)
-
-  if (player_location.x !== x) player_location.x = x
-  if (player_location.y !== y) player_location.y = y
-  if (player_location.z !== z) player_location.z = z
-}
+let interval = null
 
 onMounted(() => {
-  const { events } = game
-  events.on('STATE_UPDATED', on_state_update)
+  const { world } = game
+  interval = setInterval(() => {
+    const player = world.entities.get(PLAYER_ID)
+    if (!player) return
+
+    Object.assign(player_chunk_position, World.chunk_position(player.position))
+  }, 1000)
 })
 
 onUnmounted(() => {
-  const { events } = game
-  events.off('STATE_UPDATED', on_state_update)
+  clearInterval(interval)
 })
 </script>
 
@@ -33,7 +29,7 @@ onUnmounted(() => {
 .ui
   .top_left
     .zone Plaine des Caffres
-    .location ({{ player_location.x }}, {{ player_location.y }}, {{ player_location.z }})
+    .location ({{ player_chunk_position.x }}, {{ player_chunk_position.z }})
     .version release {{ pkg.version }}
   //- .top_right
   .bottom_panel

@@ -78,44 +78,47 @@ declare module 'events' {
   }
 }
 
-type State = import('./src/game').State
+type State = import('./game').State
 
 declare namespace Type {
   type Module = import('./game').Module
+  type State = import('./game').State
 
   type Packets = {
-    'packet:LIGHT_ADD': { type: string; [key: string]: any }
-    'packet:ENTITY_ADD': {
+    light_add: { type: string; [key: string]: any }
+    entity_add: {
       id: string
       type: string
       position: [number, number, number]
       [key: string]: any
     }
-    'packet:ENTITY_ATTACH': {
+    entity_attach: {
       id: string
       parent: string
       offset: [number, number, number]
     }
-    'packet:ENTITY_MOVE': { id: string; position: [number, number, number] }
+    entity_position: { id: string; position: [number, number, number] }
+    player_position: [number, number, number]
+    player_spawn: [number, number, number]
+    chunk_load: [number, number]
   }
 
-  type Entity = import('three').Group<import('three').Object3DEventMap>
+  type Entity = ReturnType<import('./world').default['create_myself']>
 
   // Distributed actions which can be dispatched and then reduced
   type Actions = {
-    SHOW_FPS: boolean
-    TARGET_FPS: number
-    ENTITY_ADD: {
-      id: string
-      type: string
-      position: import('three').Vector3
-      [key: string]: any
-    }
-    SHOW_BOUNDING_BOXES: boolean
-    KEYDOWN: string
-    KEYUP: string
-    PLAYER_MOVED: import('three').Vector3
-    CAMERA_ROTATED: import('three').Vector3
+    'update:show_fps': boolean
+    'update:target_fps': number
+    'update:game_speed': number
+    'update:show_terrain': boolean
+    'update:show_entities': boolean
+    'update:show_terrain_collider': boolean
+    'update:show_entities_collider': boolean
+    'update:show_terrain_volume': boolean
+    'update:show_entities_volume': boolean
+    'update:volume_depth': number
+    'update:keydown': string
+    'update:keyup': string
   } & Packets
 
   type Events = TypedEmitter<

@@ -1,27 +1,26 @@
-import { DirectionalLight, AmbientLight } from 'three'
+import { DirectionalLight, AmbientLight, HemisphereLight } from 'three'
 
 function create_light(type, settings) {
   switch (type) {
     case 'directional': {
-      const light = new DirectionalLight(settings.color, settings.intensity)
-      light.position.set(
-        settings.position.x,
-        settings.position.y,
-        settings.position.z,
-      )
-      light.castShadow = settings.shadow
-      light.shadow.camera.top = settings.shadow_camera.top
-      light.shadow.camera.bottom = settings.shadow_camera.bottom
-      light.shadow.camera.left = settings.shadow_camera.left
-      light.shadow.camera.right = settings.shadow_camera.right
-      light.shadow.camera.near = settings.shadow_camera.near
-      light.shadow.camera.far = settings.shadow_camera.far
-      light.shadow.mapSize.width = settings.shadow_camera.map_size.width
-      light.shadow.mapSize.height = settings.shadow_camera.map_size.height
+      const light = new DirectionalLight(0xffffff, 3)
+      light.position.set(1, 1.5, 1).multiplyScalar(50)
+      light.shadow.mapSize.setScalar(2048)
+      light.shadow.bias = -1e-4
+      light.shadow.normalBias = 0.05
+      light.castShadow = true
+
+      light.shadow.camera.bottom = -30
+      light.shadow.camera.left = -30
+      light.shadow.camera.top = 30
+      light.shadow.camera.right = 45
+
       return light
     }
-    case 'ambient':
-      return new AmbientLight(settings.color, settings.intensity)
+    // case 'ambient':
+    //   return new AmbientLight(settings.color, settings.intensity)
+    case 'hemisphere':
+      return new HemisphereLight(0xffffff, 0x223344, 1)
   }
 }
 
@@ -29,7 +28,7 @@ function create_light(type, settings) {
 export default function () {
   return {
     observe({ events, scene, get_state }) {
-      events.on('packet:LIGHT_ADD', ({ type, ...settings }) => {
+      events.on('light_add', ({ type, ...settings }) => {
         const light = create_light(type, settings)
         scene.add(light)
       })

@@ -5,6 +5,7 @@ import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockCont
 import { aiter } from 'iterator-helper'
 
 import { combine, named_on } from '../utils/iterator.js'
+import { PLAYER_ID } from '../game'
 
 const CAMERA_MIN_POLAR_ANGLE = 0
 const CAMERA_MAX_POLAR_ANGLE = Math.PI * 0.5 * 0.7 //  70% of the half PI
@@ -17,7 +18,13 @@ export default function () {
   let spherical_radius = 10
 
   return {
-    tick({ player: { model, height } }, { camera }) {
+    tick(_, { camera, world }) {
+      const player = world.entities.get(PLAYER_ID)
+
+      if (!player) return
+
+      const { position, height } = player
+
       // Calculate the offset position from the player using spherical coordinates
       const offset_x =
         Math.sin(camera_rotation.y) *
@@ -30,21 +37,17 @@ export default function () {
         spherical_radius
 
       camera.position.set(
-        model.position.x + offset_x,
-        model.position.y + offset_y,
-        model.position.z + offset_z,
+        position.x + offset_x,
+        position.y + offset_y,
+        position.z + offset_z,
       )
 
       // Look at the player
       camera.lookAt(
-        new Vector3(
-          model.position.x,
-          model.position.y + height / 2,
-          model.position.z,
-        ),
+        new Vector3(position.x, position.y + height / 2, position.z),
       )
     },
-    observe({ camera, events, get_state, renderer, scene, world }) {
+    observe({ camera, events, get_state, renderer, scene }) {
       camera.position.set(0, 5, 0)
 
       let is_dragging = false

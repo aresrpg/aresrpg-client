@@ -2,14 +2,19 @@ import { createApp, provide } from 'vue'
 import { registerSW } from 'virtual:pwa-register'
 import Toast, { useToast } from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
+import { BufferGeometry, Mesh } from 'three'
+import {
+  computeBoundsTree,
+  disposeBoundsTree,
+  acceleratedRaycast,
+} from 'three-mesh-bvh'
 
 // @ts-ignore
 import app from './app.vue'
 
-console.log(
-  `%c You're curious, i like you 😊`,
-  'color: #1565C0;font-weight:bold;font-size:20px;',
-)
+BufferGeometry.prototype.computeBoundsTree = computeBoundsTree
+BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree
+Mesh.prototype.raycast = acceleratedRaycast
 
 const vue_app = createApp(app)
 const toast = useToast()

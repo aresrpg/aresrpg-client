@@ -6,17 +6,12 @@ const FBX_LOADER = new FBXLoader()
 
 /** @type {(string) => Promise<import('three/examples/jsm/loaders/GLTFLoader').GLTF>} */
 export async function load_gltf(path) {
-  const model = await new Promise((resolve, reject) => {
+  const { scene } = await new Promise((resolve, reject) => {
     new GLTFLoader().load(path, resolve, null, reject)
   })
+  scene.scale.setScalar(0.01)
 
-  model.scene.traverse(object => {
-    if (object.isMesh) object.castShadow = true
-  })
-
-  model.scene.position.set(0, 0, 0)
-
-  return model
+  return scene
 }
 
 function load_fbx(path) {
@@ -30,9 +25,9 @@ export async function load_fbx_animation(path) {
   return animations[0]
 }
 
-/** @type {(path: string, scale?: number) => Promise<Type.Entity>} */
+/** @type {(path: string, scale?: number) => Promise<import("three").Object3D>} */
 export async function load_fbx_model(path, scale = 0.01) {
-  /** @type {Type.Entity} */
+  /** @type {import("three").Object3D} */
   const model = await load_fbx(path)
 
   model.rotation.set(0, Math.PI, 0)
