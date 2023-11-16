@@ -4,7 +4,7 @@ import { Box3, Vector3 } from 'three'
 
 const FBX_LOADER = new FBXLoader()
 
-/** @type {(string) => Promise<import('three/examples/jsm/loaders/GLTFLoader').GLTF>} */
+/** @type {(string) => Promise<import('three/examples/jsm/loaders/GLTFLoader').GLTF['scene']>} */
 export async function load_gltf(path) {
   const { scene } = await new Promise((resolve, reject) => {
     new GLTFLoader().load(path, resolve, null, reject)

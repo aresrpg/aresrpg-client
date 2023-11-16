@@ -16,7 +16,6 @@ export function create_capsule({
   wireframe = false,
   opacity = 1,
 }) {
-  console.log(wireframe)
   const Material = wireframe ? MeshBasicMaterial : MeshStandardMaterial
 
   // Create a cylinder geometry with the calculated dimensions
