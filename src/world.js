@@ -14,6 +14,7 @@ import {
   MeshStandardMaterial,
   Object3D,
   PlaneGeometry,
+  Raycaster,
   RepeatWrapping,
   Sphere,
   TextureLoader,
@@ -25,9 +26,11 @@ import dungeon from './models/dungeon/scene.gltf?url'
 import { load_gltf } from './utils/load_model.js'
 import { create_capsule } from './utils/entities.js'
 import Pool from './pool.js'
-import { GRAVITY, PLAYER_ID } from './game'
+import { GRAVITY, INITIAL_STATE, PLAYER_ID } from './game'
 
 const CHUNK_SIZE = 100
+const DOWN_VECTOR = new Vector3(0, -1, 0)
+const UP_VECTOR = new Vector3(0, 1, 0)
 
 const make_chunk_key = (x, z) => `${x}:${z}`
 
@@ -68,7 +71,7 @@ export default class World {
   loaded_chunks_models = new Map()
   loaded_chunks_visualizers = new Map()
 
-  /** @type {Map<string, Mesh>}  id to entity */
+  /** @type {Map<string, Type.Entity>}  id to entity */
   entities = new Map()
 
   visualizers_depth = 10
@@ -218,7 +221,9 @@ export default class World {
 
     model.updateMatrixWorld(true)
     model.traverse(child => {
+      // @ts-ignore
       if (child.isMesh) {
+        // @ts-ignore
         const mesh_color = child.material.color.getHex()
 
         if (!meshes_by_color.has(mesh_color))
@@ -264,9 +269,14 @@ export default class World {
     generated_geometry.computeBoundsTree()
 
     const collider = new Mesh(generated_geometry)
-    collider.material.wireframe = true
-    collider.material.opacity = 0.4
-    collider.material.transparent = true
+
+    // just for type checking as material could be an array
+    if (!Array.isArray(collider.material)) {
+      // @ts-ignore
+      collider.material.wireframe = true
+      collider.material.opacity = 0.4
+      collider.material.transparent = true
+    }
 
     const visualizer = new MeshBVHVisualizer(collider)
 
@@ -284,14 +294,36 @@ export default class World {
     this.loaded_chunks_visualizers.set(key, visualizer)
   }
 
+  is_on_ground(position, chunk_collider) {
+    const raycaster = new Raycaster()
+    raycaster.firstHitOnly = true
+    raycaster.set(position, DOWN_VECTOR)
+
+    const intersects = raycaster.intersectObject(chunk_collider)
+
+    if (intersects.length) {
+      const [{ distance }] = intersects
+
+      return {
+        is_on_ground: distance < 0.3,
+        distance,
+      }
+    }
+
+    return {
+      is_on_ground: false,
+      distance: Infinity,
+    }
+  }
+
   /**
    * This function takes an entity and its desired movement and returns the
    * actual movement that can be applied to the entity according to the terrain
    *
-   * @type {(collider: Type.Entity, desired_movement: Vector3) => { corrected_movement: Vector3, on_ground: boolean }
+   * @type {(collider: Type.Entity, desired_movement: Vector3) => { corrected_movement: Vector3, is_on_ground: boolean, distance_from_ground: number }}
    */
   correct_movement(
-    { three_entity, position, segment, radius },
+    { three_entity, position, segment, radius, height },
     desired_movement,
   ) {
     const chunk_position = World.chunk_position(position)
@@ -300,7 +332,11 @@ export default class World {
 
     if (!chunk_collider) {
       console.error('Chunk not loaded:', chunk_key, 'position:', position)
-      return new Vector3()
+      return {
+        corrected_movement: new Vector3(),
+        is_on_ground: false,
+        distance_from_ground: Infinity,
+      }
     }
 
     const inverted_chunk_matrix = chunk_collider.matrixWorld.clone().invert()
@@ -331,7 +367,7 @@ export default class World {
     const closest_point_in_triangle = new Vector3()
     const closest_point_in_segment = new Vector3()
 
-    const adjustement = new Vector3()
+    const adjustment = new Vector3()
 
     chunk_collider.geometry.boundsTree.shapecast({
       intersectsBounds: box => box.intersectsBox(axis_aligned_bounding_box),
@@ -348,34 +384,38 @@ export default class World {
             .sub(closest_point_in_triangle)
             .normalize()
 
-          adjustement.add(direction.multiplyScalar(depth))
-
           capsule_segment.start.addScaledVector(direction, depth)
           capsule_segment.end.addScaledVector(direction, depth)
+
+          adjustment.add(direction.multiplyScalar(depth))
         }
       },
     })
 
     // Apply the correction only if it exceeds a minimal length
-    const offset = Math.max(0.0, adjustement.length() - 1e-5)
-    adjustement.normalize().multiplyScalar(offset)
+    const offset = Math.max(0.0, adjustment.length() - 1e-5)
+    adjustment.normalize().multiplyScalar(offset)
 
     // Apply the total adjustment to the desired movement to get the corrected movement
-    const corrected_movement = desired_movement.clone().add(adjustement)
-    const scale = Math.pow(10, 3) // For three decimal places
+    const corrected_movement = desired_movement.clone().add(adjustment)
 
+    const scale = Math.pow(10, 5) // For three decimal places
     corrected_movement.x = Math.round(corrected_movement.x * scale) / scale
+    corrected_movement.y = Math.round(corrected_movement.y * scale) / scale
     corrected_movement.z = Math.round(corrected_movement.z * scale) / scale
 
-    const is_moving_horizontally = !!corrected_movement
-      .clone()
-      .setY(0)
-      .lengthSq()
+    const { is_on_ground, distance } = this.is_on_ground(
+      position
+        .clone()
+        .add(corrected_movement)
+        .sub(new Vector3(0, height * 1.4, 0)),
+      chunk_collider,
+    )
 
     return {
       corrected_movement,
-      is_on_ground: corrected_movement.y > desired_movement.y,
-      is_moving_horizontally,
+      is_on_ground,
+      distance_from_ground: distance,
     }
   }
 }

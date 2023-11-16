@@ -3,6 +3,12 @@ type EventMap = Record<string, any>
 type EventName<T extends EventMap> = string & keyof T
 type EventListener<T> = (arg: T) => void
 
+declare module '*.ogg'
+declare module '*.png'
+declare module '*.jpg'
+declare module '*.gltf?url'
+declare module '*.fbx?url'
+
 interface TypedEmitter<T extends EventMap> {
   on<K extends EventName<T>>(eventName: K, listener: EventListener<T[K]>): this
   on(eventName: string | symbol, listener: (arg: any) => void): this
@@ -124,7 +130,6 @@ declare namespace Type {
   type Events = TypedEmitter<
     {
       STATE_UPDATED: State // the game state has been updated
-      FRAME: { delta: number; state: State }
     } & Packets
   >
 

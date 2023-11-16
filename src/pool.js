@@ -36,7 +36,10 @@ function create_pool({ model, ...animations }, { count, transform }) {
 
       if (!model_instance) {
         console.warn('No more models available')
-        return {}
+        return {
+          model: null,
+          mixer: null,
+        }
       }
 
       const mixer = new AnimationMixer(model_instance)

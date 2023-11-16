@@ -114,11 +114,7 @@ function create_context() {
   // scene.background = new Color('#E0E0E0')
   scene.fog = new Fog(0x263238 / 2, 20, 70)
 
-  const world = new World({
-    collision_offset: 0.1,
-    visualize_bvh: true,
-    scene,
-  })
+  const world = new World({ scene })
   const renderer = new WebGLRenderer({ antialias: true })
 
   renderer.setPixelRatio(window.devicePixelRatio)
@@ -267,12 +263,13 @@ export default async function create_game() {
 
       if (real_delta >= frame_duration) {
         const state = get_state()
+        const delta_seconds = game_delta / 1000
 
         world.step(state)
         modules
           .map(({ tick }) => tick)
           .filter(Boolean)
-          .forEach(tick => tick(state, context, game_delta))
+          .forEach(tick => tick(state, context, delta_seconds))
 
         renderer.render(scene, camera)
 

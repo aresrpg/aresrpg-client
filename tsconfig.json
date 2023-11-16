@@ -13,6 +13,6 @@
     "resolveJsonModule": true,
     "outDir": "types",
     "skipLibCheck": true,
-    "types": ["vite-plugin-pwa/client"]
+    "types": ["vite-plugin-pwa/client", "vite/client"]
   }
 }

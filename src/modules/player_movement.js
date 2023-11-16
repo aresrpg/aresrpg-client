@@ -91,6 +91,7 @@ function compute_and_play_animation({
   inputs,
   animations,
   jump_state,
+  distance_from_ground,
 }) {
   if (current_animation === animations.RUN) play_step_sound()
 
@@ -122,8 +123,10 @@ function compute_and_play_animation({
     current_animation !== animations.FALLING &&
     current_animation !== animations.JUMP
   ) {
-    fade_to_animation(current_animation, animations.FALLING, 0.5)
-    return animations.FALLING
+    const animation =
+      distance_from_ground > 5 ? animations.FALLING : animations.RUN
+    fade_to_animation(current_animation, animation, 0.5)
+    return animation
   }
 
   if (on_ground && inputs.dance && current_animation !== animations.DANCE) {
@@ -145,12 +148,11 @@ export default function () {
   let on_ground = false
 
   return {
-    tick({ inputs }, { camera, world, controls }, delta) {
+    tick({ inputs }, { camera, world }, delta) {
       const player = world.entities.get(PLAYER_ID)
 
       if (!player) return
 
-      const delta_seconds = delta / 1000
       const { animations, position } = player
       const camera_forward = new Vector3(0, 0, -1)
         .applyQuaternion(camera.quaternion)
@@ -170,7 +172,7 @@ export default function () {
       // TODO: tp to nether if falling to hell
       if (position.y <= -30) {
         velocity.setScalar(0)
-        player.position.set(0, 50, 0)
+        player.position.set(15, 20, 4)
         return
       }
 
@@ -182,12 +184,11 @@ export default function () {
       if (inputs.left) movement.sub(camera_right)
 
       // normalize sideways movement
-      if (movement.length())
-        movement.normalize().multiplyScalar(SPEED * delta_seconds)
+      if (movement.length()) movement.normalize().multiplyScalar(SPEED * delta)
 
       // Apply jump force
       if (on_ground) {
-        if (jump_cooldown > 0) jump_cooldown -= delta_seconds
+        if (jump_cooldown > 0) jump_cooldown -= delta
         if (inputs.jump && jump_cooldown <= 0) {
           velocity.y = JUMP_FORCE
 
@@ -201,6 +202,7 @@ export default function () {
 
           jump_state = jump_states.ASCENT
           jump_cooldown = JUMP_COOLDWON
+          on_ground = false
         } else {
           jump_state = jump_states.NONE
 
@@ -214,19 +216,19 @@ export default function () {
       switch (jump_state) {
         case jump_states.ASCENT:
           // if started jumping, apply normal gravity
-          velocity.y -= GRAVITY * ASCENT_GRAVITY_FACTOR * delta_seconds
+          velocity.y -= GRAVITY * ASCENT_GRAVITY_FACTOR * delta
           // prepare apex phase
           if (velocity.y <= 0.2) jump_state = jump_states.APEX
           break
         case jump_states.APEX:
           // if apex phase, apply reduced gravity
-          velocity.y -= GRAVITY * APEX_GRAVITY_FACTOR * delta_seconds
+          velocity.y -= GRAVITY * APEX_GRAVITY_FACTOR * delta
           // prepare descent phase
           if (velocity.y <= 0) jump_state = jump_states.DESCENT
           break
         case jump_states.DESCENT:
           // if descent phase, apply increased gravity
-          velocity.y -= GRAVITY * DESCENT_GRAVITY_FACTOR * delta_seconds
+          velocity.y -= GRAVITY * DESCENT_GRAVITY_FACTOR * delta
           // and also cancel forward impulse
           velocity.x = lerp(velocity.x, 0, 0.1)
           velocity.z = lerp(velocity.z, 0, 0.1)
@@ -234,18 +236,21 @@ export default function () {
         case jump_states.NONE:
         default:
           // if not jumping, apply normal gravity
-          if (on_ground) velocity.y = -GRAVITY * delta_seconds
-          else velocity.y -= GRAVITY * delta_seconds
+          if (on_ground) velocity.y = -GRAVITY * delta
+          else velocity.y -= GRAVITY * delta
       }
 
-      movement.addScaledVector(velocity, delta_seconds)
+      movement.addScaledVector(velocity, delta)
 
-      const { corrected_movement, is_on_ground, is_moving_horizontally } =
-        world.correct_movement(player, movement, delta_seconds, velocity)
+      const { corrected_movement, is_on_ground, distance_from_ground } =
+        world.correct_movement(player, movement)
+
+      const manual_input =
+        inputs.forward || inputs.backward || inputs.left || inputs.right
+      const is_moving_horizontally =
+        !!corrected_movement.clone().setY(0).lengthSq() && manual_input
 
       on_ground = is_on_ground
-
-      console.log(corrected_movement.y, movement.y)
 
       if (is_moving_horizontally) {
         // Use lengthSq for efficiency, as we're only checking for non-zero length
@@ -266,21 +271,13 @@ export default function () {
         inputs,
         animations,
         jump_state,
+        distance_from_ground,
       })
 
       if (next_animation) current_animation = next_animation
 
       player.position.add(corrected_movement)
-
-      // if (!on_ground) {
-      //   corrected_movement.normalize()
-      //   velocity.addScaledVector(
-      //     corrected_movement,
-      //     -corrected_movement.dot(velocity),
-      //   )
-      // } else velocity.setY(0)
-
-      animations.mixer.update(delta_seconds)
+      animations.mixer.update(delta)
     },
     observe({ events, world }) {
       events.on('entity_position', ({ id, position }) => {
