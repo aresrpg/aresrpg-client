@@ -8,42 +8,64 @@ import { INITIAL_STATE } from '../game'
 /** @type {Type.Module} */
 export default function () {
   const gui = new GUI()
-  const settings = {
-    show_fps: INITIAL_STATE.settings.ui_fps_enabled,
-    show_bounding_boxes: INITIAL_STATE.settings.show_bounding_boxes,
-    target_fps: INITIAL_STATE.settings.target_fps,
-    game_speed: INITIAL_STATE.settings.game_speed,
-  }
+  const settings = { ...INITIAL_STATE.settings }
 
   return {
     observe({ events, dispatch }) {
-      gui
+      const game_folder = gui.addFolder('Game Settings')
+      const physics_folder = gui.addFolder('Physics Settings')
+
+      const handle_change = name => value => dispatch(name, value)
+
+      game_folder
         .add(settings, 'show_fps')
         .name('Show FPS')
-        .onChange(show_fps => {
-          dispatch('SHOW_FPS', show_fps)
-        })
+        .onChange(handle_change('update:show_fps'))
 
-      gui
-        .add(settings, 'show_bounding_boxes')
-        .name('Show Bounding Boxes')
-        .onChange(show_bounding_boxes => {
-          dispatch('SHOW_BOUNDING_BOXES', show_bounding_boxes)
-        })
-
-      gui
+      game_folder
         .add(settings, 'target_fps', 5, 240, 1)
         .name('Target FPS')
-        .onChange(fps => {
-          dispatch('TARGET_FPS', fps)
-        })
+        .onChange(handle_change('update:target_fps'))
 
-      gui
-        .add(settings, 'game_speed', 0.1, 2, 0.1)
+      game_folder
+        .add(settings, 'game_speed', 0, 2, 0.1)
         .name('Game Speed')
-        .onChange(game_speed => {
-          dispatch('GAME_SPEED', game_speed)
-        })
+        .onChange(handle_change('update:game_speed'))
+
+      game_folder
+        .add(settings, 'show_terrain')
+        .name('Show Terrain')
+        .onChange(handle_change('update:show_terrain'))
+
+      game_folder
+        .add(settings, 'show_entities')
+        .name('Show Entities')
+        .onChange(handle_change('update:show_entities'))
+
+      physics_folder
+        .add(settings, 'show_terrain_collider')
+        .name('Terrain collider')
+        .onChange(handle_change('update:show_terrain_collider'))
+
+      physics_folder
+        .add(settings, 'show_entities_collider')
+        .name('Entities collider')
+        .onChange(handle_change('update:show_entities_collider'))
+
+      physics_folder
+        .add(settings, 'show_terrain_volume')
+        .name('Terrain Volume')
+        .onChange(handle_change('update:show_terrain_volume'))
+
+      physics_folder
+        .add(settings, 'show_entities_volume')
+        .name('Entities Volume')
+        .onChange(handle_change('update:show_entities_volume'))
+
+      physics_folder
+        .add(settings, 'volume_depth', 1, 20, 1)
+        .name('Volume Depth')
+        .onChange(handle_change('update:volume_depth'))
 
       gui.open()
     },

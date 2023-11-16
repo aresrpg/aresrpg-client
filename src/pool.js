@@ -1,6 +1,5 @@
-import { AnimationMixer, Box3, Vector3 } from 'three'
+import { AnimationMixer, Box3, LoopOnce, Vector3 } from 'three'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { ColliderDesc } from '@dimforge/rapier3d'
 
 import { load_fbx_animation, load_fbx_model } from './utils/load_model'
 import guard_fbx from './models/guard.fbx?url'
@@ -21,7 +20,9 @@ const Models = {
   },
 }
 
-function create_pool({ model, ...animations }, count) {
+/** @typedef {ReturnType<create_pool>} ModelPool */
+
+function create_pool({ model, ...animations }, { count, transform }) {
   const data = Array.from({ length: count }).map(() => {
     const cloned = clone(model)
     cloned.visible = false
@@ -29,13 +30,13 @@ function create_pool({ model, ...animations }, count) {
   })
 
   return {
-    /** @type {() => ({ model: Type.Entity, mixer: AnimationMixer, [clip: string]: import("three").AnimationAction })} */
+    /** @type {() => ({ model: import("three").Object3D, mixer: AnimationMixer, [clip: string]: import("three").AnimationAction })} */
     get() {
       const model_instance = data.find(object => !object.visible)
 
       if (!model_instance) {
         console.warn('No more models available')
-        return
+        return {}
       }
 
       const mixer = new AnimationMixer(model_instance)
@@ -43,7 +44,7 @@ function create_pool({ model, ...animations }, count) {
       model_instance.position.set(0, 0, 0)
       model_instance.visible = true
 
-      return {
+      const pooled_entity = {
         model: model_instance,
         mixer,
         ...Object.fromEntries(
@@ -53,10 +54,18 @@ function create_pool({ model, ...animations }, count) {
           ]),
         ),
       }
+
+      return transform(pooled_entity)
     },
   }
 }
 
 export default {
-  guard: create_pool(Models.guard, 10),
+  guard: create_pool(Models.guard, {
+    count: 10,
+    transform: ({ model, mixer, ...animations }) => {
+      animations.JUMP.setLoop(LoopOnce, 0)
+      return { model, mixer, ...animations }
+    },
+  }),
 }
