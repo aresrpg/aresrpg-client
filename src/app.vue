@@ -7,6 +7,7 @@ Suspense(v-if="show_game")
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { inject as inject_vercel_analytics } from '@vercel/analytics'
 import konamiCode from '@sidp/konami-code'
 
 import konami_1 from './assets/konami_1.wav'
@@ -14,7 +15,7 @@ import konami_2 from './assets/konami_2.wav'
 import konami_3 from './assets/konami_3.wav'
 import konami_ok from './assets/konami_ok.wav'
 import Game from './game.vue'
-import { VITE_KONAMI } from './env'
+import { VITE_KONAMI } from './env.js'
 
 const name = 'app'
 const show_game = ref(!VITE_KONAMI)
@@ -39,18 +40,15 @@ if (VITE_KONAMI) {
     window.removeEventListener('keydown', play_konami_sound)
     this.remove()
   })
-
-  onMounted(() => {
-    window.addEventListener('keydown', play_konami_sound)
-  })
 }
+
+onMounted(() => {
+  if (VITE_KONAMI) window.addEventListener('keydown', play_konami_sound)
+  inject_vercel_analytics()
+})
 </script>
 
 <style lang="stylus">
-@font-face
-  font-family "nimbus-sans"
-  src url("assets/nimbus-sans.bold.otf") format("otf");
-
 sc-reset()
     margin 0
     padding 0
@@ -67,7 +65,7 @@ sc-disableScollBar()
 *
   sc-reset()
   sc-disableScollBar()
-  font-family 'Raleway', sans-serif
+  font-family 'PT Serif', sans-serif
   outline none
   scroll-behavior smooth
   &::-webkit-scrollbar-track
