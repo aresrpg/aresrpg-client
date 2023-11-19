@@ -8,9 +8,10 @@ const MAX_FPS = 240
 /** @type {Type.Module} */
 export default function () {
   return {
+    name: 'player_settings',
     reduce(state, { type, payload }) {
       switch (type) {
-        case 'update:show_fps':
+        case 'action/show_fps':
           return {
             ...state,
             settings: {
@@ -18,7 +19,7 @@ export default function () {
               show_fps: payload,
             },
           }
-        case 'update:target_fps':
+        case 'action/target_fps':
           return {
             ...state,
             settings: {
@@ -26,7 +27,7 @@ export default function () {
               target_fps: Math.max(MIN_FPS, Math.min(MAX_FPS, payload)),
             },
           }
-        case 'update:game_speed':
+        case 'action/game_speed':
           return {
             ...state,
             settings: {
@@ -34,7 +35,7 @@ export default function () {
               game_speed: Math.max(0, Math.min(2, payload)),
             },
           }
-        case 'update:show_terrain_collider':
+        case 'action/show_terrain_collider':
           return {
             ...state,
             settings: {
@@ -42,7 +43,7 @@ export default function () {
               show_terrain_collider: payload,
             },
           }
-        case 'update:show_entities_collider':
+        case 'action/show_entities_collider':
           return {
             ...state,
             settings: {
@@ -50,7 +51,7 @@ export default function () {
               show_entities_collider: payload,
             },
           }
-        case 'update:show_terrain_volume':
+        case 'action/show_terrain_volume':
           return {
             ...state,
             settings: {
@@ -58,7 +59,7 @@ export default function () {
               show_terrain_volume: payload,
             },
           }
-        case 'update:show_entities_volume':
+        case 'action/show_entities_volume':
           return {
             ...state,
             settings: {
@@ -66,7 +67,7 @@ export default function () {
               show_entities_volume: payload,
             },
           }
-        case 'update:volume_depth':
+        case 'action/volume_depth':
           return {
             ...state,
             settings: {
@@ -74,7 +75,7 @@ export default function () {
               volume_depth: Math.max(1, Math.min(20, payload)),
             },
           }
-        case 'update:show_terrain':
+        case 'action/show_terrain':
           return {
             ...state,
             settings: {
@@ -82,7 +83,7 @@ export default function () {
               show_terrain: payload,
             },
           }
-        case 'update:show_entities':
+        case 'action/show_entities':
           return {
             ...state,
             settings: {

@@ -7,11 +7,12 @@ import { aiter } from 'iterator-helper'
 export default function () {
   let stats = null
   return {
+    name: 'ui_fps',
     tick() {
       stats?.update()
     },
     reduce(state, { type, payload }) {
-      if (type === 'update:show_fps')
+      if (type === 'action/show_fps')
         return {
           ...state,
           settings: {
@@ -22,7 +23,7 @@ export default function () {
 
       return state
     },
-    observe({ events, dispatch }) {
+    observe({ events, dispatch, signal }) {
       function show_stats(show) {
         if (show && !stats) {
           stats = new Stats()
@@ -34,12 +35,12 @@ export default function () {
         }
       }
 
-      aiter(on(events, 'STATE_UPDATED'))
+      aiter(on(events, 'STATE_UPDATED', { signal }))
         .map(({ settings: { show_fps } }) => show_fps)
-        .reduce(({ last_show_fps }, show_fps) => {
+        .reduce((last_show_fps, show_fps) => {
           if (show_fps !== last_show_fps) show_stats(show_fps)
 
-          return { last_show_fps: show_fps }
+          return show_fps
         })
     },
   }

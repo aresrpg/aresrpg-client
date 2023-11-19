@@ -1,6 +1,7 @@
 import { EventEmitter, on } from 'events'
 import { PassThrough } from 'stream'
 
+import { watchEffect } from 'vue'
 import {
   Scene,
   Vector3,
@@ -9,21 +10,22 @@ import {
   PerspectiveCamera,
   Line3,
   PCFSoftShadowMap,
-  sRGBEncoding,
   Fog,
   Object3D,
   AnimationMixer,
   AnimationAction,
+  SRGBColorSpace,
+  VSMShadowMap,
 } from 'three'
 import merge from 'fast-merge-async-iterators'
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
 import { aiter } from 'iterator-helper'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 
 import { combine } from './utils/iterator.js'
 import ui_fps from './modules/ui_fps.js'
 import game_camera from './modules/game_camera.js'
 import game_lights from './modules/game_lights.js'
-import { ObjectArrayStream, WebSocketStream } from './utils/stream.js'
 import window_resize from './modules/window_resize.js'
 import entity_add from './modules/entity_add.js'
 import player_inputs from './modules/player_inputs.js'
@@ -32,31 +34,36 @@ import ui_settings from './modules/ui_settings.js'
 import player_settings from './modules/player_settings.js'
 import World from './world.js'
 import game_map from './modules/game_chunk.js'
+import create_modules_loader from './modules_loader.js'
+import game_cache from './modules/game_cache.js'
+import main_menu from './modules/main_menu.js'
+import logger from './utils/logger.js'
+import game_sky from './modules/game_sky.js'
+import game_connect from './modules/game_connect.js'
 
 export const GRAVITY = 9.81
 export const PLAYER_ID = 'player'
 
 const DEBUG_MODE = true
 
-const FILTER_ACTION_IN_LOGS = ['update:keydown', 'update:keyup']
+const FILTER_ACTION_IN_LOGS = ['action/keydown', 'action/keyup']
 
 /** @typedef {typeof INITIAL_STATE} State */
 /** @typedef {Omit<Readonly<ReturnType<typeof create_context>>, 'actions'>} Context */
 /** @typedef {(state: State, action: Type.Action) => State} Reducer */
 /** @typedef {(context: Context) => void} Observer */
 /** @typedef {(state: State, context: Context, delta: number) => void} Ticker */
-/** @typedef {{ renderer: WebGLRenderer }} ModuleInput */
-/** @typedef {({ renderer }: ModuleInput) => { reduce?: Reducer, observe?: Observer, tick?: Ticker }} Module */
-/** @typedef {typeof INITIAL_STATE.player} Entity */
+/** @typedef {(modules?: typeof GAME_MODULES) => { name: string, reduce?: Reducer, observe?: Observer, tick?: Ticker }} Module */
 /** @typedef {import("three").AnimationAction} AnimAction */
 
 export const INITIAL_STATE = {
-  entities: new Map(),
+  /** @type {Type.GameState} */
+  game_state: 'MENU',
   settings: {
     target_fps: 60,
     game_speed: 1,
     mouse_sensitivity: 0.005,
-    show_fps: true,
+    show_fps: false,
     keymap: new Map([
       ['KeyW', 'forward'],
       ['KeyS', 'backward'],
@@ -87,18 +94,29 @@ export const INITIAL_STATE = {
   },
 }
 
-const GAME_MODULES = [
+const PERMANENT_MODULES = [
+  // might need to stay first
+  game_cache,
+
   ui_fps,
-  ui_settings,
   window_resize,
-  entity_add,
   player_inputs,
-  player_movement,
   player_settings,
-  game_lights,
-  game_camera,
-  game_map,
+  game_sky,
+  game_connect,
 ]
+
+const GAME_MODULES = {
+  MENU: [main_menu],
+  GAME: [
+    ui_settings,
+    entity_add,
+    player_movement,
+    game_lights,
+    game_camera,
+    game_map,
+  ],
+}
 
 function last_event_value(emitter, event, default_value = null) {
   let value = default_value
@@ -108,21 +126,24 @@ function last_event_value(emitter, event, default_value = null) {
   return () => value
 }
 
-function create_context() {
+function create_context({ send_packet, connect_ws }) {
   const scene = new Scene()
 
   // scene.background = new Color('#E0E0E0')
   scene.fog = new Fog(0x263238 / 2, 20, 70)
 
   const world = new World({ scene })
-  const renderer = new WebGLRenderer({ antialias: true })
+  const renderer = new WebGLRenderer()
+  const composer = new EffectComposer(renderer)
+
+  composer.setSize(window.innerWidth, window.innerHeight)
 
   renderer.setPixelRatio(window.devicePixelRatio)
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setClearColor(0x263238 / 2, 1)
   renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = PCFSoftShadowMap
-  renderer.outputEncoding = sRGBEncoding
+  renderer.shadowMap.type = VSMShadowMap
+  renderer.outputColorSpace = SRGBColorSpace
 
   const camera = new PerspectiveCamera(
     75, // Field of view
@@ -143,6 +164,11 @@ function create_context() {
     world,
     events,
     actions,
+    composer,
+    /** @type {import("aresrpg-common/src/types").protocol_emitter['send']} */
+    send_packet,
+    /** @type {() => void} */
+    connect_ws,
     /**
      * @template {keyof Type.Actions} K
      * @param {K} type
@@ -154,64 +180,55 @@ function create_context() {
     scene,
     renderer,
     camera,
+    /** @type {AbortSignal} */
+    signal: new AbortController().signal,
   }
 }
 
-export default async function create_game() {
-  const { actions, ...context } = create_context()
-  const { events, scene, renderer, get_state, camera, dispatch, world } =
-    context
+export default async function create_game({
+  packets,
+  send_packet,
+  connect_ws,
+}) {
+  const { actions, ...context } = create_context({ send_packet, connect_ws })
+  const {
+    events,
+    scene,
+    renderer,
+    get_state,
+    camera,
+    dispatch,
+    world,
+    composer,
+  } = context
 
-  const modules = GAME_MODULES.map(create => create({ renderer }))
-
-  const packets = aiter(
-    // @ts-ignore
-    new ObjectArrayStream([
-      { type: 'chunk_load', payload: [0, 0] },
-      {
-        type: 'light_add',
-        payload: {
-          type: 'directional',
-          color: '#ffffff',
-          intensity: 1,
-          position: { x: -60, y: 100, z: -10 },
-          shadow: true,
-          shadow_camera: {
-            top: 50,
-            bottom: -50,
-            left: -50,
-            right: 50,
-            near: 0.1,
-            far: 200,
-            map_size: { width: 4096, height: 4096 },
-          },
-        },
-      },
-      {
-        type: 'light_add',
-        payload: {
-          type: 'hemisphere',
-          color: '#ffffff',
-          intensity: 0.7,
-        },
-      },
-      {
-        type: 'player_spawn',
-        payload: [15, 10, 4],
-      },
+  const permanent_modules = PERMANENT_MODULES.map(create => create())
+  const game_modules = Object.fromEntries(
+    Object.entries(GAME_MODULES).map(([key, modules]) => [
+      key,
+      modules.map(create => create()),
     ]),
   )
+  const modules_loader = create_modules_loader(game_modules)
 
-  modules
+  permanent_modules
     .map(({ observe }) => observe)
     .filter(Boolean)
     .forEach(observe => observe(context))
+
+  modules_loader.observe(context)
+
+  const combined_modules = [
+    modules_loader,
+    ...permanent_modules,
+    ...new Set(Object.values(game_modules).flat()).values(),
+  ]
 
   // pipe the actions and packets through the reducers
   aiter(combine(packets, actions))
     .reduce(
       (last_state, /** @type {Type.Action} */ action) => {
-        const state = modules
+        const state = combined_modules
           .map(({ reduce }) => reduce)
           .filter(Boolean)
           .reduce((intermediate, fn) => {
@@ -219,25 +236,10 @@ export default async function create_game() {
             if (!result) throw new Error(`Reducer ${fn} didn't return a state`)
             return result
           }, last_state)
-        if (action.type.includes('update:')) {
-          if (!FILTER_ACTION_IN_LOGS.includes(action.type)) {
-            console.groupCollapsed(
-              `%cinternal%c ${action.type.toUpperCase()}`,
-              'background: #F57C00; color: white; padding: 2px 4px; border-radius: 2px',
-              'font-weight: 800; color: #FFE082',
-            )
-            console.log(action.payload)
-            console.groupEnd()
-          }
-        } else {
-          console.groupCollapsed(
-            `%cnetwork%c ${action.type.toUpperCase()}`,
-            'background: #1E88E5; color: white; padding: 2px 4px; border-radius: 2px',
-            'font-weight: 800; color: #BBDEFB',
-          )
-          console.log(action.payload)
-          console.groupEnd()
-        }
+        if (action.type.includes('action/')) {
+          if (!FILTER_ACTION_IN_LOGS.includes(action.type))
+            logger.INTERNAL(action.type, action.payload)
+        } else logger.NETWORK_IN(action.type, action.payload)
         events.emit(action.type, action.payload)
         events.emit('STATE_UPDATED', state)
         return state
@@ -249,6 +251,8 @@ export default async function create_game() {
     .catch(error => {
       console.error(error)
     })
+
+  dispatch('action/load_game_state', 'MENU')
 
   function animation() {
     let frame_duration = 1000 / INITIAL_STATE.settings.target_fps
@@ -266,12 +270,14 @@ export default async function create_game() {
         const delta_seconds = game_delta / 1000
 
         world.step(state)
-        modules
+        permanent_modules
           .map(({ tick }) => tick)
           .filter(Boolean)
           .forEach(tick => tick(state, context, delta_seconds))
 
-        renderer.render(scene, camera)
+        modules_loader.tick(state, context, delta_seconds)
+        // renderer.render(scene, camera)
+        composer.render()
 
         last_frame_time = current_time - (real_delta % frame_duration)
 
@@ -291,6 +297,7 @@ export default async function create_game() {
   return {
     events,
     world,
+    dispatch,
     start(container) {
       container.appendChild(renderer.domElement)
       animation()(performance.now())
