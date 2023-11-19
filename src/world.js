@@ -27,15 +27,96 @@ import { load_gltf } from './utils/load_model.js'
 import { create_capsule } from './utils/entities.js'
 import Pool from './pool.js'
 import { GRAVITY, INITIAL_STATE, PLAYER_ID } from './game'
+import dispose from './utils/dispose'
 
 const CHUNK_SIZE = 100
 const DOWN_VECTOR = new Vector3(0, -1, 0)
 const UP_VECTOR = new Vector3(0, 1, 0)
 
+/** @typedef {ReturnType<typeof World.create_entity>} Entity */
+
 const make_chunk_key = (x, z) => `${x}:${z}`
 
+async function prepare_chunk(x, z, path) {
+  const model = await load_gltf(path)
+
+  model.position.set(x * CHUNK_SIZE, 0, z * CHUNK_SIZE)
+
+  const box = new Box3()
+  const meshes_by_color = new Map()
+  const terrain = new Group()
+
+  model.updateMatrixWorld(true)
+
+  box.setFromObject(model)
+  box.getCenter(model.position).negate()
+
+  model.traverse(child => {
+    // @ts-ignore
+    if (child.isMesh) {
+      // @ts-ignore
+      const mesh_color = child.material.color.getHex()
+
+      if (!meshes_by_color.has(mesh_color)) meshes_by_color.set(mesh_color, [])
+
+      meshes_by_color.get(mesh_color).push(child)
+    }
+  })
+
+  meshes_by_color.forEach((meshes, mesh_color) => {
+    const visual_geometries = meshes
+      .map(mesh => {
+        if (mesh.material.emissive.r) {
+          terrain.attach(mesh)
+          return null
+        }
+        return mesh.geometry.clone().applyMatrix4(mesh.matrixWorld)
+      })
+      .filter(Boolean)
+
+    if (visual_geometries.length) {
+      const merged_geometry = mergeGeometries(visual_geometries)
+      const mesh = new Mesh(
+        merged_geometry,
+        new MeshStandardMaterial({
+          color: parseInt(mesh_color),
+          shadowSide: 2,
+        }),
+      )
+
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      mesh.material.shadowSide = 2
+
+      terrain.add(mesh)
+    }
+  })
+
+  const static_generator = new StaticGeometryGenerator(terrain)
+  static_generator.attributes = ['position']
+
+  const generated_geometry = static_generator.generate()
+  generated_geometry.boundsTree = new MeshBVH(generated_geometry)
+
+  const collider = new Mesh(generated_geometry)
+
+  // just for type checking as material could be an array
+  if (!Array.isArray(collider.material)) {
+    // @ts-ignore
+    collider.material.wireframe = true
+    collider.material.opacity = 0.4
+    collider.material.transparent = true
+  }
+
+  const visualizer = new MeshBVHVisualizer(collider)
+
+  return {
+    [make_chunk_key(x, z)]: { collider, terrain, visualizer },
+  }
+}
+
 const Chunks = {
-  [make_chunk_key(0, 0)]: await load_gltf(dungeon),
+  ...(await prepare_chunk(0, 0, dungeon)),
 }
 
 function compute_transformed_matrix(entity, desired_movement) {
@@ -69,6 +150,7 @@ export default class World {
   /** @type {Map<string, Mesh>} chunk position to chunk */
   loaded_chunks_colliders = new Map()
   loaded_chunks_models = new Map()
+  /** @type {Map<string, MeshBVHVisualizer>} chunk position to chunk */
   loaded_chunks_visualizers = new Map()
 
   /** @type {Map<string, Type.Entity>}  id to entity */
@@ -83,7 +165,7 @@ export default class World {
   /**
    * @param {import("./pool").ModelPool} pooled_entity
    */
-  static create_entity(pooled_entity) {
+  static create_entity(pooled_entity, id) {
     const { model, mixer, ...animations } = pooled_entity.get()
 
     if (!model) throw new Error('No more models available')
@@ -119,7 +201,7 @@ export default class World {
     three_entity.add(collider)
 
     return {
-      id: '',
+      id,
       three_entity,
       height,
       radius,
@@ -142,6 +224,7 @@ export default class World {
 
   /** @type {(state: Type.State) => void} */
   step({
+    current_state,
     settings: {
       volume_depth,
       show_terrain_collider,
@@ -191,7 +274,10 @@ export default class World {
       if (visualizer) {
         if (visualizer.visible !== show_entities_volume)
           visualizer.visible = show_entities_volume
-        if (visualizer.depth !== volume_depth) visualizer.depth = volume_depth
+        // @ts-ignore
+        if (visualizer.depth !== volume_depth)
+          // @ts-ignore
+          visualizer.depth = volume_depth
       }
 
       if (model && model.visible !== show_entities)
@@ -199,87 +285,23 @@ export default class World {
     })
   }
 
-  spawn_entity({ id, entity, scene, position }) {
+  spawn_entity({ id, entity, position, signal }) {
     entity.id = id
     entity.position.copy(position)
-    scene.add(entity.three_entity)
+    this.scene.add(entity.three_entity)
     this.entities.set(id, entity)
+
+    signal.addEventListener('abort', () => {
+      this.scene.remove(entity.three_entity)
+      this.entities.delete(id)
+      dispose(entity.three_entity)
+    })
   }
 
-  /** @type {(x: number, z: number) => void} */
-  load_chunk(x, z) {
-    const model = Chunks[make_chunk_key(x, z)]
-
-    model.position.set(x * CHUNK_SIZE, 0, z * CHUNK_SIZE)
-
-    const box = new Box3()
-    const meshes_by_color = new Map()
-    const terrain = new Group()
-
-    box.setFromObject(model)
-    box.getCenter(model.position).negate()
-
-    model.updateMatrixWorld(true)
-    model.traverse(child => {
-      // @ts-ignore
-      if (child.isMesh) {
-        // @ts-ignore
-        const mesh_color = child.material.color.getHex()
-
-        if (!meshes_by_color.has(mesh_color))
-          meshes_by_color.set(mesh_color, [])
-
-        meshes_by_color.get(mesh_color).push(child)
-      }
-    })
-
-    meshes_by_color.forEach((meshes, mesh_color) => {
-      const visual_geometries = meshes
-        .map(mesh => {
-          if (mesh.material.emissive.r) {
-            terrain.attach(mesh)
-            return null
-          }
-          return mesh.geometry.clone().applyMatrix4(mesh.matrixWorld)
-        })
-        .filter(Boolean)
-
-      if (visual_geometries.length) {
-        const merged_geometry = mergeGeometries(visual_geometries)
-        const mesh = new Mesh(
-          merged_geometry,
-          new MeshStandardMaterial({
-            color: parseInt(mesh_color),
-            shadowSide: 2,
-          }),
-        )
-
-        mesh.castShadow = true
-        mesh.receiveShadow = true
-        mesh.material.shadowSide = 2
-
-        terrain.add(mesh)
-      }
-    })
-
-    const static_generator = new StaticGeometryGenerator(terrain)
-    static_generator.attributes = ['position']
-
-    const generated_geometry = static_generator.generate()
-    generated_geometry.computeBoundsTree()
-
-    const collider = new Mesh(generated_geometry)
-
-    // just for type checking as material could be an array
-    if (!Array.isArray(collider.material)) {
-      // @ts-ignore
-      collider.material.wireframe = true
-      collider.material.opacity = 0.4
-      collider.material.transparent = true
-    }
-
-    const visualizer = new MeshBVHVisualizer(collider)
-
+  /** @type {(x: number, z: number, signal: AbortSignal) => void} */
+  load_chunk(x, z, signal) {
+    const key = make_chunk_key(x, z)
+    const { collider, terrain, visualizer } = Chunks[key]
     // adding the volumes to the scene
     this.scene.add(visualizer)
     // adding the collider (with wireframe material) to the scene
@@ -287,11 +309,22 @@ export default class World {
     // adding the terrain model to the scene
     this.scene.add(terrain)
 
-    const key = make_chunk_key(x, z)
-
     this.loaded_chunks_colliders.set(key, collider)
     this.loaded_chunks_models.set(key, terrain)
     this.loaded_chunks_visualizers.set(key, visualizer)
+
+    signal?.addEventListener(
+      'abort',
+      () => {
+        this.scene.remove(visualizer)
+        this.scene.remove(collider)
+        this.scene.remove(terrain)
+        this.loaded_chunks_colliders.delete(key)
+        this.loaded_chunks_models.delete(key)
+        this.loaded_chunks_visualizers.delete(key)
+      },
+      { once: true },
+    )
   }
 
   is_on_ground(position, chunk_collider) {

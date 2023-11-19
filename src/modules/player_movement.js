@@ -148,6 +148,7 @@ export default function () {
   let on_ground = false
 
   return {
+    name: 'player_movements',
     tick({ inputs }, { camera, world }, delta) {
       const player = world.entities.get(PLAYER_ID)
 
@@ -164,6 +165,7 @@ export default function () {
         .normalize()
 
       if (!current_animation) {
+        // @ts-ignore
         current_animation = animations.IDLE
         current_animation.play()
       }

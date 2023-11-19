@@ -1,39 +1,9 @@
-type EventMap = Record<string, any>
-
-type EventName<T extends EventMap> = string & keyof T
-type EventListener<T> = (arg: T) => void
-
 declare module '*.ogg'
 declare module '*.png'
 declare module '*.jpg'
 declare module '*.gltf?url'
 declare module '*.fbx?url'
-
-interface TypedEmitter<T extends EventMap> {
-  on<K extends EventName<T>>(eventName: K, listener: EventListener<T[K]>): this
-  on(eventName: string | symbol, listener: (arg: any) => void): this
-
-  once<K extends EventName<T>>(
-    eventName: K,
-    listener: EventListener<T[K]>,
-  ): this
-  once(eventName: string | symbol, listener: (arg: any) => void): this
-
-  off<K extends EventName<T>>(eventName: K, listener: EventListener<T[K]>): this
-  off(eventName: string | symbol, listener: (arg: any) => void): this
-
-  removeListener<K extends EventName<T>>(
-    eventName: K,
-    listener: EventListener<T[K]>,
-  ): this
-  removeListener(eventName: string | symbol, listener: (arg: any) => void): this
-
-  emit<K extends EventName<T>>(eventName: K, arg: T[K]): boolean
-  emit(eventName: string | symbol, arg: any): boolean
-
-  setMaxListeners(number): this
-  removeAllListeners(): this
-}
+declare module '*.glsl?url'
 
 declare module 'stream' {
   class PassThrough {
@@ -42,101 +12,42 @@ declare module 'stream' {
   }
 }
 
-declare module 'events' {
-  interface StaticEventEmitterOptions {
-    signal?: AbortSignal | undefined
-  }
-
-  function on(
-    emitter: NodeJS.EventEmitter | EventTarget,
-    eventName: string,
-    options?: StaticEventEmitterOptions,
-  ): AsyncIterableIterator<any>
-  function on<T, K extends EventName<T>>(
-    emitter: TypedEmitter<T> | EventTarget,
-    eventName: K,
-    options?: StaticEventEmitterOptions,
-  ): AsyncIterableIterator<[T[K]]>
-  function on<T>(
-    emitter: TypedEmitter<T> | EventTarget,
-    eventName: string,
-    options?: StaticEventEmitterOptions,
-  ): AsyncIterableIterator<any>
-
-  class EventEmitter {
-    static on(
-      emitter: NodeJS.EventEmitter,
-      eventName: string,
-      options?: StaticEventEmitterOptions,
-    ): AsyncIterableIterator<any>
-
-    static on<T, K extends EventName<T>>(
-      emitter: TypedEmitter<T>,
-      eventName: K,
-      options?: StaticEventEmitterOptions,
-    ): AsyncIterableIterator<[T[K]]>
-
-    static on<T>(
-      emitter: TypedEmitter<T>,
-      eventName: string,
-      options?: StaticEventEmitterOptions,
-    ): AsyncIterableIterator<any>
-  }
+declare module 'three/addons/capabilities/WebGL.js' {
+  function isWebGLAvailable(): boolean
 }
-
-type State = import('./game').State
 
 declare namespace Type {
   type Module = import('./game').Module
   type State = import('./game').State
+  type Packets = import('aresrpg-common/src/types').Packets
+  type GameState = 'MENU' | 'GAME'
 
-  type Packets = {
-    light_add: { type: string; [key: string]: any }
-    entity_add: {
-      id: string
-      type: string
-      position: [number, number, number]
-      [key: string]: any
-    }
-    entity_attach: {
-      id: string
-      parent: string
-      offset: [number, number, number]
-    }
-    entity_position: { id: string; position: [number, number, number] }
-    player_position: [number, number, number]
-    player_spawn: [number, number, number]
-    chunk_load: [number, number]
-  }
-
-  type Entity = ReturnType<import('./world').default['create_myself']>
+  type Entity = import('./world').Entity
 
   // Distributed actions which can be dispatched and then reduced
   type Actions = {
-    'update:show_fps': boolean
-    'update:target_fps': number
-    'update:game_speed': number
-    'update:show_terrain': boolean
-    'update:show_entities': boolean
-    'update:show_terrain_collider': boolean
-    'update:show_entities_collider': boolean
-    'update:show_terrain_volume': boolean
-    'update:show_entities_volume': boolean
-    'update:volume_depth': number
-    'update:keydown': string
-    'update:keyup': string
+    'action/show_fps': boolean
+    'action/target_fps': number
+    'action/game_speed': number
+    'action/show_terrain': boolean
+    'action/show_entities': boolean
+    'action/show_terrain_collider': boolean
+    'action/show_entities_collider': boolean
+    'action/show_terrain_volume': boolean
+    'action/show_entities_volume': boolean
+    'action/volume_depth': number
+    'action/keydown': string
+    'action/keyup': string
+    'action/load_game_state': GameState
   } & Packets
 
-  type Events = TypedEmitter<
+  type Events = import('aresrpg-common/src/types').TypedEmitter<
     {
       STATE_UPDATED: State // the game state has been updated
+      SHOW_CLASS_SELECTION: boolean // the class selection screen should be shown
+      CONNECT_TO_SERVER: { name: string }
     } & Packets
   >
-
-  type Dispatcher<T extends EventMap, K extends EventName<T>> = (
-    type: K,
-    payload: T[K],
-  ) => void
 
   type Action = {
     [K in keyof Actions]: { type: K; payload: Actions[K] }

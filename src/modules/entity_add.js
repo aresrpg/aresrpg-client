@@ -21,20 +21,21 @@ import World from '../world.js'
 /** @type {Type.Module} */
 export default function () {
   return {
-    observe({ events, get_state, scene, world, dispatch }) {
+    name: 'entity_add',
+    observe({ events, world, signal }) {
       events.on('player_spawn', payload => {
         const [x, y, z] = payload
         const position = new Vector3(x, y, z)
 
         if (world.entities.has(PLAYER_ID)) return
 
-        const player = World.create_entity(Pool.guard)
+        const player = World.create_entity(Pool.guard, PLAYER_ID)
 
         world.spawn_entity({
           id: PLAYER_ID,
           entity: player,
           position,
-          scene,
+          signal,
         })
       })
     },

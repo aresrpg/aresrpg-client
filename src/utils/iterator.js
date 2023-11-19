@@ -11,3 +11,16 @@ export async function* named_on(events, event, options) {
   for await (const payload of on(events, event, options))
     yield { event, payload }
 }
+
+/**
+ * @template T
+ * @param {AsyncIterableIterator<T> | AsyncIterable<T>} iterator
+ * @returns {AsyncIterator<T>}
+ */
+export async function* abortable(iterator) {
+  try {
+    yield* iterator
+  } catch (error) {
+    if (!(error instanceof Error && error.name === 'AbortError')) throw error
+  }
+}

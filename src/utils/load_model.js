@@ -3,11 +3,12 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { Box3, Vector3 } from 'three'
 
 const FBX_LOADER = new FBXLoader()
+const GLTF_LOADER = new GLTFLoader()
 
 /** @type {(string) => Promise<import('three/examples/jsm/loaders/GLTFLoader').GLTF['scene']>} */
 export async function load_gltf(path) {
   const { scene } = await new Promise((resolve, reject) => {
-    new GLTFLoader().load(path, resolve, null, reject)
+    GLTF_LOADER.load(path, resolve, null, reject)
   })
   scene.scale.setScalar(0.01)
 

@@ -1,4 +1,5 @@
 import { DirectionalLight, AmbientLight, HemisphereLight } from 'three'
+import { nanoid } from 'nanoid'
 
 function create_light(type, settings) {
   switch (type) {
@@ -17,8 +18,8 @@ function create_light(type, settings) {
 
       return light
     }
-    // case 'ambient':
-    //   return new AmbientLight(settings.color, settings.intensity)
+    case 'ambient':
+      return new AmbientLight(settings.color, settings.intensity)
     case 'hemisphere':
       return new HemisphereLight(0xffffff, 0x223344, 1)
   }
@@ -26,11 +27,23 @@ function create_light(type, settings) {
 
 /** @type {Type.Module} */
 export default function () {
+  const lights_names = new Set()
+
   return {
-    observe({ events, scene, get_state }) {
+    name: 'game_lights',
+    observe({ events, scene, signal }) {
       events.on('light_add', ({ type, ...settings }) => {
         const light = create_light(type, settings)
+        light.name = nanoid()
         scene.add(light)
+        lights_names.add(light.name)
+      })
+
+      signal.addEventListener('abort', () => {
+        lights_names.forEach(name => {
+          const light = scene.getObjectByName(name)
+          if (light) scene.remove(light)
+        })
       })
     },
   }

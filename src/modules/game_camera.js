@@ -4,7 +4,7 @@ import { PerspectiveCamera, Vector3 } from 'three'
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
 import { aiter } from 'iterator-helper'
 
-import { combine, named_on } from '../utils/iterator.js'
+import { abortable, combine, named_on } from '../utils/iterator.js'
 import { PLAYER_ID } from '../game'
 
 const CAMERA_MIN_POLAR_ANGLE = 0
@@ -18,6 +18,7 @@ export default function () {
   let spherical_radius = 10
 
   return {
+    name: 'game_camera',
     tick(_, { camera, world }) {
       const player = world.entities.get(PLAYER_ID)
 
@@ -47,23 +48,30 @@ export default function () {
         new Vector3(position.x, position.y + height / 2, position.z),
       )
     },
-    observe({ camera, events, get_state, renderer, scene }) {
+    observe({ camera, get_state, renderer, signal }) {
       camera.position.set(0, 5, 0)
 
       let is_dragging = false
-
-      renderer.domElement.addEventListener('mousedown', () => {
+      const on_mouse_down = () => {
         is_dragging = true
         renderer.domElement.requestPointerLock()
+      }
+
+      renderer.domElement.addEventListener('mousedown', on_mouse_down, {
+        signal,
       })
 
-      window.addEventListener('mouseup', () => {
-        is_dragging = false
-        if (document.pointerLockElement === renderer.domElement)
-          document.exitPointerLock()
-      })
+      window.addEventListener(
+        'mouseup',
+        () => {
+          is_dragging = false
+          if (document.pointerLockElement === renderer.domElement)
+            document.exitPointerLock()
+        },
+        { signal },
+      )
 
-      aiter(on(window, 'mousemove'))
+      aiter(abortable(on(window, 'mousemove', { signal })))
         .filter(() => is_dragging)
         .forEach(({ movementX, movementY }) => {
           const state = get_state()
@@ -80,8 +88,13 @@ export default function () {
             )
           }
         })
+        // when the module is unloaded we cleanup
+        .finally(() => {
+          if (document.pointerLockElement === renderer.domElement)
+            document.exitPointerLock()
+        })
 
-      aiter(on(window, 'wheel')).forEach(({ deltaY }) => {
+      aiter(on(window, 'wheel', { signal })).forEach(({ deltaY }) => {
         spherical_radius += deltaY * 0.05
         spherical_radius = Math.max(
           CAMERA_MIN_ZOOM,

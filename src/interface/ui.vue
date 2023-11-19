@@ -6,6 +6,7 @@ import World from '../world.js'
 import pkg from '../../package.json'
 
 const game = inject('game')
+const ws_status = inject('ws_status')
 const player_chunk_position = reactive({ x: 0, z: 0 })
 
 let interval = null
@@ -30,7 +31,10 @@ onUnmounted(() => {
   .top_left
     .zone Plaine des Caffres
     .location ({{ player_chunk_position.x }}, {{ player_chunk_position.z }})
-    .version release {{ pkg.version }}
+    .version version {{ pkg.version }}
+    .ws
+      .title socket
+      .status(:class="{ online: ws_status === 'OPEN', connecting: ws_status === 'CONNECTING', offline: ws_status === 'CLOSED' }")
   //- .top_right
   .bottom_panel
     .chat
@@ -61,6 +65,27 @@ onUnmounted(() => {
       margin-top 1em
       font-size .8em
       color #EEEEEE
+    .ws
+      display flex
+      flex-flow row nowrap
+      font-size .8em
+      align-items center
+      .title
+        color #EEEEEE
+        padding-right .5em
+      .status
+        width 10px
+        height @width
+        border-radius 50%
+        &.online
+          background limegreen
+          box-shadow 0 0 5px limegreen
+        &.connecting
+          background orange
+          box-shadow 0 0 5px orange
+        &.offline
+          background crimson
+          box-shadow 0 0 5px crimson
   .top_right
     width 300px
     height 200px
