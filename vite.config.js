@@ -15,7 +15,6 @@ export default defineConfig({
     target: 'esnext',
     minify: true,
   },
-  publicDir: 'assets',
   plugins: [
     wasm(),
     vue(),
