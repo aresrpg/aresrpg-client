@@ -42,8 +42,6 @@ export default function () {
   let camera_moving = false
   const camera_target_position = new Vector3()
   let lerp_factor = 0
-  // is the focus on the class selection menu?
-  let class_selection = false
 
   return {
     name: 'main_menu',
@@ -119,18 +117,15 @@ export default function () {
 
       scene.add(model)
 
-      events.on('SHOW_CLASS_SELECTION', show => {
-        if (!class_selection && show) camera_target_position.set(-8, 1.3, 4)
-        else if (class_selection && !show) camera_target_position.set(-1, 2, 7)
+      events.on('MOVE_MENU_CAMERA', ([x, y, z]) => {
+        camera_target_position.set(x, y, z)
         camera_moving = true
         lerp_factor = 0
-        class_selection = show
       })
 
       signal.addEventListener('abort', () => {
         sound.stop()
-        composer.removePass(n8aopass)
-        composer.removePass(smaapass)
+        composer.removePass(renderpass)
         model.visible = false
         dispose(grass)
         scene.remove(grass)

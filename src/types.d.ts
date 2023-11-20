@@ -19,7 +19,7 @@ declare module 'three/addons/capabilities/WebGL.js' {
 declare namespace Type {
   type Module = import('./game').Module
   type State = import('./game').State
-  type Packets = import('aresrpg-common/src/types').Packets
+  type Packets = import('aresrpg-protocol/src/types').Packets
   type GameState = 'MENU' | 'GAME'
 
   type Entity = import('./world').Entity
@@ -39,13 +39,14 @@ declare namespace Type {
     'action/keydown': string
     'action/keyup': string
     'action/load_game_state': GameState
+    'action/set_state_player_position': Position
   } & Packets
 
-  type Events = import('aresrpg-common/src/types').TypedEmitter<
+  type Events = import('aresrpg-protocol/src/types').TypedEmitter<
     {
       STATE_UPDATED: State // the game state has been updated
-      SHOW_CLASS_SELECTION: boolean // the class selection screen should be shown
-      CONNECT_TO_SERVER: { name: string }
+      MOVE_MENU_CAMERA: [number, number, number] // move the camera of the menu screen
+      CONNECT_TO_SERVER: void // request ws connection to the server
     } & Packets
   >
 

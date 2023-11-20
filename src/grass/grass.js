@@ -130,6 +130,7 @@ class Grass extends Mesh {
   }
 
   update(delta) {
+    // @ts-ignore
     this.material.uniforms.uTime.value = Date.now() - date
   }
 }

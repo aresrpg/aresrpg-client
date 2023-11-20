@@ -1,5 +1,6 @@
 <template lang="pug">
 .aresrpg(v-if="webgl_available")
+  Loader
   Interface(v-if="STATE.game_state === 'GAME'")
   Menu(v-else)
   .canvas(ref='renderer_container')
@@ -9,13 +10,15 @@
 <script setup>
 import { PassThrough } from 'stream'
 
-import { onMounted, onUnmounted, ref, provide, reactive } from 'vue'
+import { onMounted, onUnmounted, ref, provide, reactive, watch } from 'vue'
 import WebGL from 'three/addons/capabilities/WebGL.js'
 import { useWebSocket } from '@vueuse/core'
-import { protocol_emitter } from 'aresrpg-common'
+import { create_client } from 'aresrpg-protocol'
+import { Position } from 'aresrpg-protocol/generated/ares_pb'
 
 import logger from './utils/logger.js'
 import Interface from './interface/ui.vue'
+import Loader from './interface/loading.vue'
 import Menu from './interface/menu.vue'
 import { VITE_WS_SERVER } from './env'
 import create_game from './game.js'
@@ -25,56 +28,72 @@ const name = 'app'
 const renderer_container = ref(null)
 const webgl_available = ref(true)
 const packets = new PassThrough({ objectMode: true })
-const server_emitter = ref(null)
-const ws_status = ref(null)
-const game = await create_game({
-  packets,
-  send_packet(type, payload) {
-    if (!server_emitter.value) throw new Error('Not connected to server')
-    logger.NETWORK_OUT(type, payload)
-    server_emitter.value.send(type, payload)
-  },
-  connect_ws() {
-    return new Promise(resolve => {
-      const { status } = useWebSocket(VITE_WS_SERVER, {
-        autoReconnect: true,
-        onConnected: ws => {
-          ws.binaryType = 'arraybuffer'
-          logger.SOCKET(`connected to ${VITE_WS_SERVER}`)
-          server_emitter.value = protocol_emitter(ws)
-          server_emitter.value.on('packet', ({ type, value }) => {
-            packets.write({ type, payload: value })
-          })
+const ares_client = ref(null)
+const ws_status = ref('')
+const game = ref(
+  await create_game({
+    packets,
+    send_packet(type, payload) {
+      if (!ares_client.value) throw new Error('Not connected to server')
+      logger.NETWORK_OUT(type, payload)
+      ares_client.value.send(type, payload)
+    },
+    connect_ws() {
+      return new Promise(resolve => {
+        const { status } = useWebSocket(VITE_WS_SERVER, {
+          autoReconnect: true,
+          onDisconnected(ws, event) {
+            ares_client.value?.notify_end(event.reason)
+            logger.SOCKET(`disconnected: ${event.reason}`)
+          },
+          onMessage(ws, event) {
+            const message = event.data
+            ares_client.value.notify_message(message)
+          },
+          onConnected: ws => {
+            ws.binaryType = 'arraybuffer'
+            logger.SOCKET(`connected to ${VITE_WS_SERVER}`)
 
-          resolve()
-        },
+            ares_client.value = create_client({
+              socket_write: ws.send.bind(ws),
+              socket_end: message => ws.close(1000, message),
+            })
+
+            ares_client.value.stream.pipe(packets)
+
+            resolve()
+          },
+        })
+
+        watch(status, value => {
+          ws_status.value = value
+        })
       })
-      ws_status.value = status
-    })
-  },
-})
+    },
+  }),
+)
 
-const { events } = game
-
-const STATE = reactive({})
+const STATE = ref({})
 
 provide('state', STATE)
 provide('game', game)
-provide('ws_status', status)
+provide('ws_status', ws_status)
 
-const update_state = state => Object.assign(STATE, state)
+const update_state = state => {
+  STATE.value = state
+}
 
 onMounted(async () => {
-  const { start } = game
+  const { start } = game.value
   if (WebGL.isWebGLAvailable()) {
     start(renderer_container.value)
-    events.on('STATE_UPDATE', update_state)
+    game.value.events.on('STATE_UPDATED', update_state)
   } else webgl_available.value = false
 })
 
 onUnmounted(async () => {
-  const { stop } = game
-  events.off('STATE_UPDATE', update_state)
+  const { stop } = game.value
+  game.value.events.off('STATE_UPDATED', update_state)
   stop()
 })
 </script>

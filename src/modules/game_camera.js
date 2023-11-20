@@ -21,7 +21,6 @@ export default function () {
     name: 'game_camera',
     tick(_, { camera, world }) {
       const player = world.entities.get(PLAYER_ID)
-
       if (!player) return
 
       const { position, height } = player
@@ -42,7 +41,6 @@ export default function () {
         position.y + offset_y,
         position.z + offset_z,
       )
-
       // Look at the player
       camera.lookAt(
         new Vector3(position.x, position.y + height / 2, position.z),
