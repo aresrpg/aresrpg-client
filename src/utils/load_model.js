@@ -7,18 +7,14 @@ const GLTF_LOADER = new GLTFLoader()
 
 /** @type {(string) => Promise<import('three/examples/jsm/loaders/GLTFLoader').GLTF['scene']>} */
 export async function load_gltf(path) {
-  const { scene } = await new Promise((resolve, reject) => {
-    GLTF_LOADER.load(path, resolve, null, reject)
-  })
+  const { scene } = await GLTF_LOADER.loadAsync(path)
   scene.scale.setScalar(0.01)
 
   return scene
 }
 
 function load_fbx(path) {
-  return new Promise((resolve, reject) => {
-    FBX_LOADER.load(path, resolve, null, reject)
-  })
+  return FBX_LOADER.loadAsync(path)
 }
 
 export async function load_fbx_animation(path) {

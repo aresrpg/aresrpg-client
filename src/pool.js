@@ -65,7 +65,7 @@ function create_pool({ model, ...animations }, { count, transform }) {
 
 export default {
   guard: create_pool(Models.guard, {
-    count: 10,
+    count: 3,
     transform: ({ model, mixer, ...animations }) => {
       animations.JUMP.setLoop(LoopOnce, 0)
       return { model, mixer, ...animations }

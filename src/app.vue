@@ -6,7 +6,7 @@ Suspense(v-if="show_game")
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, provide } from 'vue'
 import { inject as inject_vercel_analytics } from '@vercel/analytics'
 import konamiCode from '@sidp/konami-code'
 
@@ -21,6 +21,9 @@ const name = 'app'
 const show_game = ref(!VITE_KONAMI)
 const konami_sounds = [konami_1, konami_2, konami_3]
 const allowed_keys = [37, 38, 39, 40, 66, 65]
+const loading = ref(false)
+
+provide('loading', loading)
 
 const play_konami_sound = event => {
   if (!allowed_keys.includes(event?.keyCode)) return

@@ -8,6 +8,9 @@ import {
   disposeBoundsTree,
   acceleratedRaycast,
 } from 'three-mesh-bvh'
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+import { faPlus } from '@fortawesome/free-solid-svg-icons'
 
 // @ts-ignore
 import app from './app.vue'
@@ -19,7 +22,9 @@ Mesh.prototype.raycast = acceleratedRaycast
 const vue_app = createApp(app)
 const toast = useToast()
 
-vue_app.use(Toast).mount('#app')
+library.add(faPlus)
+
+vue_app.component('fa', FontAwesomeIcon).use(Toast).mount('#app')
 
 const updateSW = registerSW({
   onOfflineReady() {

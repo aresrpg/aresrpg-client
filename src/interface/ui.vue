@@ -1,36 +1,8 @@
-<script setup>
-import { onMounted, onUnmounted, inject, reactive } from 'vue'
-
-import { PLAYER_ID } from '../game.js'
-import World from '../world.js'
-import pkg from '../../package.json'
-
-const game = inject('game')
-const ws_status = inject('ws_status')
-const player_chunk_position = reactive({ x: 0, z: 0 })
-
-let interval = null
-
-onMounted(() => {
-  const { world } = game
-  interval = setInterval(() => {
-    const player = world.entities.get(PLAYER_ID)
-    if (!player) return
-
-    Object.assign(player_chunk_position, World.chunk_position(player.position))
-  }, 1000)
-})
-
-onUnmounted(() => {
-  clearInterval(interval)
-})
-</script>
-
 <template lang="pug">
 .ui
   .top_left
     .zone Plaine des Caffres
-    .location ({{ player_chunk_position.x }}, {{ player_chunk_position.z }})
+    .location {{position}}
     .version version {{ pkg.version }}
     .ws
       .title socket
@@ -43,6 +15,21 @@ onUnmounted(() => {
     .map
 
 </template>
+
+<script setup>
+import { onMounted, onUnmounted, inject, computed } from 'vue'
+
+import { PLAYER_ID } from '../game.js'
+import World from '../world.js'
+import pkg from '../../package.json'
+
+const ws_status = inject('ws_status')
+const state = inject('state')
+
+const position = computed(() =>
+  state.value.position.toArray().map(v => Math.round(v)),
+)
+</script>
 
 <style lang="stylus" scoped>
 .ui

@@ -20,7 +20,7 @@ import {
 import merge from 'fast-merge-async-iterators'
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
 import { aiter } from 'iterator-helper'
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 
 import { combine } from './utils/iterator.js'
 import ui_fps from './modules/ui_fps.js'
@@ -40,13 +40,18 @@ import main_menu from './modules/main_menu.js'
 import logger from './utils/logger.js'
 import game_sky from './modules/game_sky.js'
 import game_connect from './modules/game_connect.js'
+import player_characters from './modules/player_characters.js'
 
 export const GRAVITY = 9.81
 export const PLAYER_ID = 'player'
 
 const DEBUG_MODE = true
 
-const FILTER_ACTION_IN_LOGS = ['action/keydown', 'action/keyup']
+const FILTER_ACTION_IN_LOGS = [
+  'action/keydown',
+  'action/keyup',
+  'action/set_state_player_position',
+]
 
 /** @typedef {typeof INITIAL_STATE} State */
 /** @typedef {Omit<Readonly<ReturnType<typeof create_context>>, 'actions'>} Context */
@@ -92,6 +97,19 @@ export const INITIAL_STATE = {
     jump: false,
     dance: false,
   },
+
+  // the player's position is in the world's entities list
+  // but we keep this one for access in the UI
+  // it is updated by the player_movement module every 100ms
+  position: new Vector3(),
+  characters_limit: 3,
+  characters: [
+    {
+      id: 'some-id',
+      name: 'some-name',
+      level: 1,
+    },
+  ],
 }
 
 const PERMANENT_MODULES = [
@@ -107,7 +125,7 @@ const PERMANENT_MODULES = [
 ]
 
 const GAME_MODULES = {
-  MENU: [main_menu],
+  MENU: [main_menu, player_characters],
   GAME: [
     ui_settings,
     entity_add,
@@ -149,10 +167,10 @@ function create_context({ send_packet, connect_ws }) {
     75, // Field of view
     window.innerWidth / window.innerHeight, // Aspect ratio
     0.1, // Near clipping plane
-    50, // Far clipping plane
+    1000, // Far clipping plane
   )
 
-  camera.far = 100
+  // camera.far = 100
 
   /** @type {Type.Events} */
   // @ts-ignore
@@ -165,9 +183,9 @@ function create_context({ send_packet, connect_ws }) {
     events,
     actions,
     composer,
-    /** @type {import("aresrpg-common/src/types").protocol_emitter['send']} */
+    /** @type {import("aresrpg-protocol/src/types").create_client['send']} */
     send_packet,
-    /** @type {() => void} */
+    /** @type {() => Promise<void>} */
     connect_ws,
     /**
      * @template {keyof Type.Actions} K
@@ -225,7 +243,7 @@ export default async function create_game({
   ]
 
   // pipe the actions and packets through the reducers
-  aiter(combine(packets, actions))
+  aiter(combine(actions, packets))
     .reduce(
       (last_state, /** @type {Type.Action} */ action) => {
         const state = combined_modules
@@ -276,8 +294,8 @@ export default async function create_game({
           .forEach(tick => tick(state, context, delta_seconds))
 
         modules_loader.tick(state, context, delta_seconds)
-        // renderer.render(scene, camera)
-        composer.render()
+        renderer.render(scene, camera)
+        // composer.render()
 
         last_frame_time = current_time - (real_delta % frame_duration)
 
@@ -298,6 +316,7 @@ export default async function create_game({
     events,
     world,
     dispatch,
+    send_packet,
     start(container) {
       container.appendChild(renderer.domElement)
       animation()(performance.now())

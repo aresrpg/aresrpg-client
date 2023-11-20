@@ -21,6 +21,7 @@ import {
   Vector3,
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { to_chunk_position, CHUNK_SIZE } from 'aresrpg-protocol/src/chunk.js'
 
 import dungeon from './models/dungeon/scene.gltf?url'
 import { load_gltf } from './utils/load_model.js'
@@ -29,7 +30,6 @@ import Pool from './pool.js'
 import { GRAVITY, INITIAL_STATE, PLAYER_ID } from './game'
 import dispose from './utils/dispose'
 
-const CHUNK_SIZE = 100
 const DOWN_VECTOR = new Vector3(0, -1, 0)
 const UP_VECTOR = new Vector3(0, 1, 0)
 
@@ -40,7 +40,7 @@ const make_chunk_key = (x, z) => `${x}:${z}`
 async function prepare_chunk(x, z, path) {
   const model = await load_gltf(path)
 
-  model.position.set(x * CHUNK_SIZE, 0, z * CHUNK_SIZE)
+  model.position.set(-20, 0, 30)
 
   const box = new Box3()
   const meshes_by_color = new Map()
@@ -136,8 +136,10 @@ function get_model_size(model, scale = 0.01) {
   const size = bbox.getSize(new Vector3())
   const center = bbox.getCenter(new Vector3())
 
-  const height = size.y / scale / 2
-  const radius = size.z + size.x / scale / 2 / 2
+  const height = size.y
+  const radius = size.z + size.x / 2
+
+  console.log('height:', height, 'radius:', radius, model)
 
   return {
     height,
@@ -165,7 +167,7 @@ export default class World {
   /**
    * @param {import("./pool").ModelPool} pooled_entity
    */
-  static create_entity(pooled_entity, id) {
+  static create_entity(pooled_entity) {
     const { model, mixer, ...animations } = pooled_entity.get()
 
     if (!model) throw new Error('No more models available')
@@ -201,7 +203,6 @@ export default class World {
     three_entity.add(collider)
 
     return {
-      id,
       three_entity,
       height,
       radius,
@@ -213,13 +214,6 @@ export default class World {
       position: three_entity.position,
       target_position: null,
     }
-  }
-
-  static chunk_position(position) {
-    const x = Math.floor((position.x + CHUNK_SIZE / 2) / CHUNK_SIZE)
-    const z = Math.floor((position.z + CHUNK_SIZE / 2) / CHUNK_SIZE)
-
-    return { x, z }
   }
 
   /** @type {(state: Type.State) => void} */
@@ -285,16 +279,15 @@ export default class World {
     })
   }
 
-  spawn_entity({ id, entity, position, signal }) {
-    entity.id = id
-    entity.position.copy(position)
+  spawn_entity(entity, position, signal) {
+    entity.three_entity.position.copy(position)
     this.scene.add(entity.three_entity)
-    this.entities.set(id, entity)
+    this.entities.set(entity.id, entity)
 
     signal.addEventListener('abort', () => {
       this.scene.remove(entity.three_entity)
-      this.entities.delete(id)
-      dispose(entity.three_entity)
+      this.entities.delete(entity.id)
+      // dispose(entity.three_entity)
     })
   }
 
@@ -359,7 +352,7 @@ export default class World {
     { three_entity, position, segment, radius, height },
     desired_movement,
   ) {
-    const chunk_position = World.chunk_position(position)
+    const chunk_position = to_chunk_position(position)
     const chunk_key = make_chunk_key(chunk_position.x, chunk_position.z)
     const chunk_collider = this.loaded_chunks_colliders.get(chunk_key)
 

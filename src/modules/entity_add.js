@@ -23,20 +23,14 @@ export default function () {
   return {
     name: 'entity_add',
     observe({ events, world, signal }) {
-      events.on('player_spawn', payload => {
-        const [x, y, z] = payload
+      events.on('packet/spawnPlayer', ({ position: { x, y, z } }) => {
         const position = new Vector3(x, y, z)
 
         if (world.entities.has(PLAYER_ID)) return
 
-        const player = World.create_entity(Pool.guard, PLAYER_ID)
+        const player = World.create_entity(Pool.guard)
 
-        world.spawn_entity({
-          id: PLAYER_ID,
-          entity: player,
-          position,
-          signal,
-        })
+        world.spawn_entity({ ...player, id: PLAYER_ID }, position, signal)
       })
     },
   }

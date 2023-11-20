@@ -3,45 +3,95 @@
   nav
     img.logo(:src="logo")
     .version build {{ pkg.version }}
-  .menu_play(v-if="!class_selection")
+  .menu_play(v-if="menu_type === 'PLAY'")
     img.logo(:src="text_logo")
-    .play.btn(@click="on_create_class_click") Play as guest
-  .menu_classes(v-if="class_selection")
+    .play.btn(@click="play_as_guest") Play as guest
+  .menu_characters(v-if="menu_type === 'CHARACTERS'")
+    .character(v-for="character in state.characters" @click="() => select_character(character)")
+      .skin
+      .grad
+      .name {{ character.name }}
+      .level Lvl {{ character.level }}
+    .character_new(
+        v-if="state.characters?.length < state.characters_limit"
+        @click="show_characters_creation"
+      )
+      .skin
+      .grad
+      fa(:icon="['fas', 'plus']")
+  .menu_create_character(v-if="menu_type === 'CREATE_CHARACTER'")
     .slider
     .desc
     .perso
     .spells
     input.name(placeholder="Enter your name" v-model="name")
-    .back.btn(@click="on_back_click") Cancel
-    .play.btn(@click="on_play_click") Play
+    .back.btn(@click="show_characters_menu") Cancel
+    .play.btn(@click="create_character") Create
 </template>
 
 <script setup>
-import { inject, onMounted, ref } from 'vue'
+import { inject, onUnmounted, onMounted, ref, watch, watchEffect } from 'vue'
 
 import logo from '../assets/logo.png'
 import text_logo from '../assets/text_logo.png'
 import pkg from '../../package.json'
 
 const game = inject('game')
+const state = inject('state')
+const loading = inject('loading')
+const ws_status = inject('ws_status')
 const name = ref('')
 
-const class_selection = ref(false)
+const menu_type = ref('PLAY')
 
-function on_create_class_click() {
-  game.events.emit('SHOW_CLASS_SELECTION', true)
-  class_selection.value = true
+function play_as_guest() {
+  game.value.events.emit('CONNECT_TO_SERVER')
+  loading.value = true
 }
 
-function on_back_click() {
-  class_selection.value = false
-  game.events.emit('SHOW_CLASS_SELECTION', false)
+function show_characters_menu() {
+  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 1.2, 4])
+  menu_type.value = 'CHARACTERS'
 }
 
-function on_play_click() {
-  game.dispatch('action/load_game_state', 'GAME')
-  game.events.emit('CONNECT_TO_SERVER', { name: name.value })
+function show_characters_creation() {
+  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 1.6, 4])
+  menu_type.value = 'CREATE_CHARACTER'
 }
+
+function on_character_list({ characters }) {
+  loading.value = false
+  if (!characters.length) show_characters_creation()
+  else show_characters_menu()
+}
+
+function on_connection_success() {
+  game.value.send_packet('packet/listCharacters', {})
+}
+
+function create_character() {
+  if (!name.value) {
+    alert('Please enter a name')
+    return
+  }
+
+  game.value.send_packet('packet/createCharacter', { name: name.value })
+}
+
+function select_character({ id }) {
+  game.value.dispatch('action/load_game_state', 'GAME')
+  game.value.send_packet('packet/selectCharacter', { id })
+}
+
+onMounted(() => {
+  game.value.events.once('packet/connectionSuccess', on_connection_success)
+  game.value.events.on('packet/listCharactersResponse', on_character_list)
+})
+
+onUnmounted(() => {
+  game.value.events.off('packet/connectionSuccess', on_connection_success)
+  game.value.events.off('packet/listCharactersResponse', on_character_list)
+})
 </script>
 
 <style lang="stylus" scoped>
@@ -73,11 +123,79 @@ function on_play_click() {
       font-size .8em
       color #212121
 
-  .menu_classes
+  .menu_characters
+    position absolute
+    background rgba(#212121, .5)
+    width 80%
+    top 50%
+    left 50%
+    transform translate(-50%, -50%)
+    backdrop-filter blur(12px)
+    padding 2em
+    border-radius 6px
+    overflow hidden
+    display grid
+    grid-template-columns auto 1fr
+    grid-column-gap 2em
+    >*
+      cursor pointer
+      border 1px solid white
+      border-radius 6px
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+      transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+      overflow hidden
+      position relative
+      &:hover
+        box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+      .skin
+        position absolute
+        width 100%
+        height 100%
+        background url('https://www.pockettactics.com/wp-content/sites/pockettactics/2023/08/waven-early-access.jpg') center / cover
+        filter grayscale(50%)
+        z-index -1
+      .grad
+        position absolute
+        width 100%
+        height 100%
+        background linear-gradient(to bottom, transparent 0%, black 100%)
+        z-index -1
+    .character
+      display flex
+      flex-flow column nowrap
+      height 500px
+      width 200px
+      align-items center
+      .name
+        margin-top 420px
+        font-size 1.1em
+        font-weight 900
+        text-shadow 1px 2px 3px black
+        color #eeeeee
+      .level
+        font-size .8em
+        color #eeeeee
+        text-transform uppercase
+    .character_new
+      height 500px
+      width 200px
+      display grid
+      justify-content center
+      align-items center
+      .skin
+        filter grayscale(100%) blur(3px)
+        opacity .6
+      >*
+        color white
+        font-size 2.5em
+
+
+
+
+  .menu_create_character
     position absolute
     width 80%
     height 80%
-    background #212121
     top 50%
     left 50%
     transform translate(-50%, -50%)

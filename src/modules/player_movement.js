@@ -1,4 +1,5 @@
 import { on } from 'events'
+import { setInterval } from 'timers/promises'
 
 import { aiter } from 'iterator-helper'
 import {
@@ -19,6 +20,7 @@ import step4 from '../assets/step4.ogg'
 import step5 from '../assets/step5.ogg'
 import step6 from '../assets/step6.ogg'
 import { GRAVITY, PLAYER_ID } from '../game.js'
+import { abortable } from '../utils/iterator'
 
 const SPEED = 5
 const JUMP_FORCE = 13
@@ -174,7 +176,7 @@ export default function () {
       // TODO: tp to nether if falling to hell
       if (position.y <= -30) {
         velocity.setScalar(0)
-        player.position.set(15, 20, 4)
+        player.position.set(0, 20, 0)
         return
       }
 
@@ -281,7 +283,16 @@ export default function () {
       player.position.add(corrected_movement)
       animations.mixer.update(delta)
     },
-    observe({ events, world }) {
+    reduce(state, { type, payload }) {
+      if (type === 'action/set_state_player_position') {
+        return {
+          ...state,
+          position: payload,
+        }
+      }
+      return state
+    },
+    observe({ events, world, signal, dispatch }) {
       events.on('entity_position', ({ id, position }) => {
         const entity = world.entities.get(id)
         const [x, y, z] = position
@@ -292,6 +303,14 @@ export default function () {
         const [x, y, z] = position
         const player = world.entities.get(PLAYER_ID)
         if (player) player.target_position.set(x, y, z)
+      })
+
+      aiter(abortable(setInterval(100, null, { signal }))).forEach(() => {
+        // every 100ms, update the position in the state (for UI)
+        const player = world.entities.get(PLAYER_ID)
+        if (!player) return
+
+        dispatch('action/set_state_player_position', player.position)
       })
     },
   }
