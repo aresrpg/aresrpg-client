@@ -21,7 +21,7 @@ import {
   Vector3,
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { to_chunk_position, CHUNK_SIZE } from 'aresrpg-protocol/src/chunk.js'
+import { to_chunk_position, CHUNK_SIZE } from 'aresrpg-protocol'
 
 import dungeon from './models/dungeon/scene.gltf?url'
 import { load_gltf } from './utils/load_model.js'
