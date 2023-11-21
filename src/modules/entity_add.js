@@ -28,7 +28,7 @@ export default function () {
 
         if (world.entities.has(PLAYER_ID)) return
 
-        const player = World.create_entity(Pool.guard)
+        const player = Pool.guard.get()
 
         world.spawn_entity({ ...player, id: PLAYER_ID }, position, signal)
       })

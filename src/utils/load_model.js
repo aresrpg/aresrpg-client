@@ -27,7 +27,6 @@ export async function load_fbx_model(path, scale = 0.01) {
   /** @type {import("three").Object3D} */
   const model = await load_fbx(path)
 
-  model.rotation.set(0, Math.PI, 0)
   model.scale.multiplyScalar(scale)
 
   model.traverse(object => {

@@ -8,6 +8,7 @@ import {
   MeshBasicMaterial,
   MeshStandardMaterial,
 } from 'three'
+import { MeshBVH } from 'three-mesh-bvh'
 
 export function create_capsule({
   height,
@@ -20,6 +21,8 @@ export function create_capsule({
 
   // Create a cylinder geometry with the calculated dimensions
   const geometry = new CapsuleGeometry(radius, height, wireframe ? 1 : 20, 20)
+
+  geometry.boundsTree = new MeshBVH(geometry)
 
   return new Mesh(geometry, new Material({ color, opacity }))
 }

@@ -37,7 +37,11 @@ sound.setVolume(0.5)
 
 /** @type {Type.Module} */
 export default function () {
-  const { model, mixer, ...animations } = Pool.guard.get()
+  const entity = Pool.guard.get()
+  const {
+    body,
+    animations: { IDLE, mixer },
+  } = entity
 
   let camera_moving = false
   const camera_target_position = new Vector3()
@@ -110,12 +114,13 @@ export default function () {
       // composer.addPass(smaapass)
       // composer.addPass(outputpass)
 
-      model.position.set(1, 0.3, 5)
-      model.rotation.y = 4
+      entity.body.position.set(1, 1.5, 5)
+      entity.body.rotation.y = -0.8
 
-      animations.IDLE.play()
+      entity.body.collider.visible = false
+      // entity.body.visualizer.visible = false
 
-      scene.add(model)
+      IDLE.play()
 
       events.on('MOVE_MENU_CAMERA', ([x, y, z]) => {
         camera_target_position.set(x, y, z)
@@ -126,8 +131,8 @@ export default function () {
       signal.addEventListener('abort', () => {
         sound.stop()
         composer.removePass(renderpass)
-        model.visible = false
         dispose(grass)
+        entity.remove()
         scene.remove(grass)
       })
     },

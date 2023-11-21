@@ -22,7 +22,19 @@ declare namespace Type {
   type Packets = import('aresrpg-protocol/src/types').Packets
   type GameState = 'MENU' | 'GAME'
 
-  type Entity = import('./world').Entity
+  type Entity = {
+    body: import('three').Object3D
+    height: number
+    radius: number
+    segment: import('three').Line3
+    animations: {
+      mixer: import('three').AnimationMixer
+      [clip: string]: import('three').AnimationAction
+    }
+    position: import('three').Vector3
+    target_position: import('three').Vector3
+    remove: () => void
+  }
 
   // Distributed actions which can be dispatched and then reduced
   type Actions = {

@@ -32,8 +32,6 @@ import dispose from './utils/dispose'
 const DOWN_VECTOR = new Vector3(0, -1, 0)
 const UP_VECTOR = new Vector3(0, 1, 0)
 
-/** @typedef {ReturnType<typeof World.create_entity>} Entity */
-
 const make_chunk_key = (x, z) => `${x}:${z}`
 
 async function prepare_chunk(x, z, path) {
@@ -116,6 +114,7 @@ async function prepare_chunk(x, z, path) {
 
 const Chunks = {
   ...(await prepare_chunk(0, 0, '/dungeon/scene.gltf')),
+  ...(await prepare_chunk(0, 1, '/dungeon/scene.gltf')),
 }
 
 function compute_transformed_matrix(entity, desired_movement) {
@@ -128,23 +127,6 @@ function compute_transformed_matrix(entity, desired_movement) {
 
   // Multiply the entity's matrixWorld with the translation matrix
   return new Matrix4().multiplyMatrices(entity.matrixWorld, translation_matrix)
-}
-
-function get_model_size(model, scale = 0.01) {
-  const bbox = new Box3().setFromObject(model)
-  const size = bbox.getSize(new Vector3())
-  const center = bbox.getCenter(new Vector3())
-
-  const height = size.y
-  const radius = size.z + size.x / 2
-
-  console.log('height:', height, 'radius:', radius, model)
-
-  return {
-    height,
-    radius,
-    segment: new Line3(new Vector3(), new Vector3(0, -height, 0.0)),
-  }
 }
 
 export default class World {
@@ -161,58 +143,6 @@ export default class World {
 
   constructor({ scene }) {
     this.scene = scene
-  }
-
-  /**
-   * @param {import("./pool").ModelPool} pooled_entity
-   */
-  static create_entity(pooled_entity) {
-    const { model, mixer, ...animations } = pooled_entity.get()
-
-    if (!model) throw new Error('No more models available')
-
-    const three_entity = new Object3D()
-    const { height, radius, segment } = get_model_size(model)
-
-    model.position.set(0, -height, 0)
-
-    const collider = create_capsule({
-      height,
-      radius,
-      color: '#dddddd',
-    })
-
-    collider.geometry.computeBoundsTree()
-    collider.castShadow = true
-    collider.receiveShadow = true
-    collider.material.shadowSide = 2
-
-    const visualizer = new MeshBVHVisualizer(collider)
-
-    model.name = 'model'
-    visualizer.name = 'visualizer'
-    collider.name = 'collider'
-
-    model.position.y -= height * 0.6
-    visualizer.position.y -= height / 2
-    collider.position.y -= height / 2
-
-    three_entity.add(model)
-    three_entity.add(visualizer)
-    three_entity.add(collider)
-
-    return {
-      three_entity,
-      height,
-      radius,
-      segment,
-      animations: {
-        mixer,
-        ...animations,
-      },
-      position: three_entity.position,
-      target_position: null,
-    }
   }
 
   /** @type {(state: Type.State) => void} */
@@ -256,10 +186,8 @@ export default class World {
         chunk_model.visible = show_terrain
     })
 
-    this.entities.forEach(({ three_entity }) => {
-      const model = three_entity.getObjectByName('model')
-      const collider = three_entity.getObjectByName('collider')
-      const visualizer = three_entity.getObjectByName('visualizer')
+    this.entities.forEach(({ body }) => {
+      const { model, collider, visualizer } = body
 
       if (collider && collider.visible !== show_entities_collider)
         collider.visible = show_entities_collider
@@ -279,14 +207,13 @@ export default class World {
   }
 
   spawn_entity(entity, position, signal) {
-    entity.three_entity.position.copy(position)
-    this.scene.add(entity.three_entity)
+    entity.body.position.copy(position)
+
     this.entities.set(entity.id, entity)
 
     signal.addEventListener('abort', () => {
-      this.scene.remove(entity.three_entity)
       this.entities.delete(entity.id)
-      // dispose(entity.three_entity)
+      entity.remove()
     })
   }
 
@@ -348,7 +275,7 @@ export default class World {
    * @type {(collider: Type.Entity, desired_movement: Vector3) => { corrected_movement: Vector3, is_on_ground: boolean, distance_from_ground: number }}
    */
   correct_movement(
-    { three_entity, position, segment, radius, height },
+    { body, position, segment, radius, height },
     desired_movement,
   ) {
     const chunk_position = to_chunk_position(position)
@@ -366,7 +293,7 @@ export default class World {
 
     const inverted_chunk_matrix = chunk_collider.matrixWorld.clone().invert()
     const desired_model_matrix = compute_transformed_matrix(
-      three_entity,
+      body,
       desired_movement,
     )
     const capsule_segment = segment.clone()
@@ -393,6 +320,8 @@ export default class World {
     const closest_point_in_segment = new Vector3()
 
     const adjustment = new Vector3()
+
+    console.log(chunk_collider.geometry.getAttribute('position'))
 
     chunk_collider.geometry.boundsTree.shapecast({
       intersectsBounds: box => box.intersectsBox(axis_aligned_bounding_box),

@@ -41,6 +41,7 @@ import logger from './utils/logger.js'
 import game_sky from './modules/game_sky.js'
 import game_connect from './modules/game_connect.js'
 import player_characters from './modules/player_characters.js'
+import { add_pools_to_scene } from './pool.js'
 
 export const GRAVITY = 9.81
 export const PLAYER_ID = 'player'
@@ -170,7 +171,7 @@ function create_context({ send_packet, connect_ws }) {
     1000, // Far clipping plane
   )
 
-  // camera.far = 100
+  camera.far = 100
 
   /** @type {Type.Events} */
   // @ts-ignore
@@ -219,6 +220,8 @@ export default async function create_game({
     world,
     composer,
   } = context
+
+  add_pools_to_scene(scene)
 
   const permanent_modules = PERMANENT_MODULES.map(create => create())
   const game_modules = Object.fromEntries(

@@ -141,7 +141,7 @@ function compute_and_play_animation({
 export default function () {
   const velocity = new Vector3()
   const controller = null
-  const model_forward = new Vector3(0, 0, -1)
+  const model_forward = new Vector3(0, 0, 1)
 
   const last_corrected_movement = new Vector3()
   let jump_state = jump_states.NONE
@@ -265,7 +265,7 @@ export default function () {
           model_forward,
           flat_movement,
         )
-        player.three_entity.quaternion.slerp(quaternion, 0.2)
+        player.body.quaternion.slerp(quaternion, 0.2)
       }
 
       const next_animation = compute_and_play_animation({
