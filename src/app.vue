@@ -65,6 +65,26 @@ sc-disableScollBar()
   font-size 18px
   background #212121
 
+.ares_btn
+  border 1px solid #212121
+  background linear-gradient(to right, #16222A, #3A6073)
+  padding 1em 2em
+  border-radius 3px
+  font-weight 900
+  box-shadow 1px 2px 3px black
+  cursor pointer
+  color #eee
+  display flex
+  justify-content center
+  box-shadow 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)
+  transition all 0.3s cubic-bezier(.25,.8,.25,1)
+  &:hover
+    box-shadow 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22)
+  &.disabled
+    opacity .5
+    cursor default
+    pointer-events none
+
 *
   sc-reset()
   sc-disableScollBar()
@@ -93,4 +113,26 @@ sc-disableScollBar()
   display flex
   justify-content center
   align-items center
+
+.card-1
+  box-shadow 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)
+  transition all 0.3s cubic-bezier(.25,.8,.25,1)
+
+.card-1:hover
+  box-shadow 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22)
+
+.card-2
+  box-shadow 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)
+
+
+.card-3
+  box-shadow 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)
+
+
+.card-4
+  box-shadow 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22)
+
+
+.card-5
+  box-shadow 0 19px 38px rgba(0,0,0,0.30), 0 15px 12px rgba(0,0,0,0.22)
 </style>

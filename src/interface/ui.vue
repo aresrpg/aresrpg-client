@@ -14,10 +14,14 @@
     .inventory
     .map
 
+  .escape_menu(v-if="escape_menu_open")
+    .keys.ares_btn.disabled(@click="on_menu_controls_btn") Controls
+    .quit.ares_btn(@click="on_menu_quit_btn") Change Character
+
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, inject, computed } from 'vue'
+import { onMounted, onUnmounted, inject, computed, ref } from 'vue'
 
 import { PLAYER_ID } from '../game.js'
 import World from '../world.js'
@@ -25,10 +29,32 @@ import pkg from '../../package.json'
 
 const ws_status = inject('ws_status')
 const state = inject('state')
+const game = inject('game')
+const escape_menu_open = ref(false)
 
 const position = computed(() =>
   state.value.position.toArray().map(v => Math.round(v)),
 )
+
+function on_escape({ key }) {
+  if (key === 'Escape') {
+    escape_menu_open.value = !escape_menu_open.value
+  }
+}
+
+function on_menu_quit_btn() {
+  game.value.dispatch('action/load_game_state', 'MENU')
+}
+
+function on_menu_controls_btn() {}
+
+onMounted(() => {
+  window.addEventListener('keydown', on_escape)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', on_escape)
+})
 </script>
 
 <style lang="stylus" scoped>
@@ -101,4 +127,23 @@ const position = computed(() =>
     .map
       grid-area map
       border 3px solid #F1C40F
+
+  .escape_menu
+    position absolute
+    background rgba(#212121, .5)
+    top 50%
+    left 50%
+    transform translate(-50%, -50%)
+    backdrop-filter blur(12px)
+    padding 2em
+    padding-bottom 1em
+    border-radius 6px
+    overflow hidden
+    >*
+      width 300px
+      padding 1em .5em
+      display flex
+      margin-bottom 1em
+    .keys
+      opacity .6
 </style>

@@ -23,7 +23,6 @@ import {
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { to_chunk_position, CHUNK_SIZE } from 'aresrpg-protocol'
 
-import dungeon from './models/dungeon/scene.gltf?url'
 import { load_gltf } from './utils/load_model.js'
 import { create_capsule } from './utils/entities.js'
 import Pool from './pool.js'
@@ -116,7 +115,7 @@ async function prepare_chunk(x, z, path) {
 }
 
 const Chunks = {
-  ...(await prepare_chunk(0, 0, dungeon)),
+  ...(await prepare_chunk(0, 0, '/dungeon/scene.gltf')),
 }
 
 function compute_transformed_matrix(entity, desired_movement) {

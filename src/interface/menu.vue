@@ -5,7 +5,7 @@
     .version build {{ pkg.version }}
   .menu_play(v-if="menu_type === 'PLAY'")
     img.logo(:src="text_logo")
-    .play.btn(@click="play_as_guest") Play as guest
+    .play.ares_btn(@click="play_as_guest") Play as guest
   .menu_characters(v-if="menu_type === 'CHARACTERS'")
     .character(v-for="character in state.characters" @click="() => select_character(character)")
       .skin
@@ -25,8 +25,8 @@
     .perso
     .spells
     input.name(placeholder="Enter your name" v-model="name")
-    .back.btn(@click="show_characters_menu") Cancel
-    .play.btn(@click="create_character") Create
+    .back.ares_btn(@click="show_characters_menu") Cancel
+    .play.ares_btn(@click="create_character") Create
 </template>
 
 <script setup>
@@ -42,7 +42,7 @@ const loading = inject('loading')
 const ws_status = inject('ws_status')
 const name = ref('')
 
-const menu_type = ref('PLAY')
+const menu_type = ref(ws_status.value === 'OPEN' ? 'CHARACTERS' : 'PLAY')
 
 function play_as_guest() {
   game.value.events.emit('CONNECT_TO_SERVER')
@@ -96,15 +96,6 @@ onUnmounted(() => {
 
 <style lang="stylus" scoped>
 
-.btn
-  background linear-gradient(to right, #16222A, #3A6073)
-  padding 1em 2em
-  border-radius 3px
-  font-weight 900
-  box-shadow 1px 2px 3px black
-  cursor pointer
-  color #ddd
-
 .menu
   nav
     position absolute
@@ -126,7 +117,6 @@ onUnmounted(() => {
   .menu_characters
     position absolute
     background rgba(#212121, .5)
-    width 80%
     top 50%
     left 50%
     transform translate(-50%, -50%)
@@ -135,8 +125,8 @@ onUnmounted(() => {
     border-radius 6px
     overflow hidden
     display grid
-    grid-template-columns auto 1fr
     grid-column-gap 2em
+    grid-auto-flow column
     >*
       cursor pointer
       border 1px solid white
