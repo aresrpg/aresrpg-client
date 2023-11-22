@@ -55,7 +55,8 @@ function events_interceptor(emitter) {
   })
 }
 
-export default function (modules) {
+/** @type {Type.Module} */
+export default function ({ modules }) {
   let game_state = null
   const loaded_modules = new Set()
 

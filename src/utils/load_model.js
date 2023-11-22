@@ -1,6 +1,6 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
-import { Box3, Vector3 } from 'three'
+import { Box3, DefaultLoadingManager, Vector3 } from 'three'
 
 const FBX_LOADER = new FBXLoader()
 const GLTF_LOADER = new GLTFLoader()

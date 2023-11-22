@@ -59,21 +59,6 @@ export default function () {
         .name('Entities collider')
         .onChange(handle_change('action/show_entities_collider'))
 
-      terrain_folder
-        .add(settings, 'show_terrain_volume')
-        .name('Terrain Volume')
-        .onChange(handle_change('action/show_terrain_volume'))
-
-      entity_folder
-        .add(settings, 'show_entities_volume')
-        .name('Entities Volume')
-        .onChange(handle_change('action/show_entities_volume'))
-
-      game_folder
-        .add(settings, 'volume_depth', 1, 20, 1)
-        .name('Volume Depth')
-        .onChange(handle_change('action/volume_depth'))
-
       gui.open()
     },
   }

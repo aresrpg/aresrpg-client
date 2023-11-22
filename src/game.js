@@ -1,39 +1,32 @@
 import { EventEmitter, on } from 'events'
 import { PassThrough } from 'stream'
 
-import { watchEffect } from 'vue'
 import {
   Scene,
   Vector3,
   Color,
   WebGLRenderer,
   PerspectiveCamera,
-  Line3,
-  PCFSoftShadowMap,
   Fog,
-  Object3D,
-  AnimationMixer,
   AnimationAction,
   SRGBColorSpace,
   VSMShadowMap,
+  DefaultLoadingManager,
 } from 'three'
 import merge from 'fast-merge-async-iterators'
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
 import { aiter } from 'iterator-helper'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { World } from '@dimforge/rapier3d'
 
 import { combine } from './utils/iterator.js'
 import ui_fps from './modules/ui_fps.js'
 import game_camera from './modules/game_camera.js'
 import game_lights from './modules/game_lights.js'
 import window_resize from './modules/window_resize.js'
-import entity_add from './modules/entity_add.js'
 import player_inputs from './modules/player_inputs.js'
 import player_movement from './modules/player_movement.js'
 import ui_settings from './modules/ui_settings.js'
 import player_settings from './modules/player_settings.js'
-import World from './world.js'
-import game_map from './modules/game_chunk.js'
 import create_modules_loader from './modules_loader.js'
 import game_cache from './modules/game_cache.js'
 import main_menu from './modules/main_menu.js'
@@ -41,25 +34,37 @@ import logger from './utils/logger.js'
 import game_sky from './modules/game_sky.js'
 import game_connect from './modules/game_connect.js'
 import player_characters from './modules/player_characters.js'
-import { add_pools_to_scene } from './pool.js'
+import game_world from './modules/game_world.js'
+import initialize_chunks from './chunks.js'
+import create_pools from './pool.js'
 
 export const GRAVITY = 9.81
 export const PLAYER_ID = 'player'
 
 const DEBUG_MODE = true
-
+const LOADING_MANAGER = DefaultLoadingManager
 const FILTER_ACTION_IN_LOGS = [
   'action/keydown',
   'action/keyup',
   'action/set_state_player_position',
 ]
 
+LOADING_MANAGER.onStart = (url, itemsLoaded, itemsTotal) => {
+  window.dispatchEvent(new Event('assets_loading'))
+  logger.ASSET(`Loading asset ${url}`, { itemsLoaded, itemsTotal })
+}
+
+LOADING_MANAGER.onLoad = () => {
+  logger.ASSET('All assets loaded')
+  window.dispatchEvent(new Event('assets_loaded'))
+}
+
 /** @typedef {typeof INITIAL_STATE} State */
-/** @typedef {Omit<Readonly<ReturnType<typeof create_context>>, 'actions'>} Context */
+/** @typedef {Omit<Readonly<Awaited<ReturnType<typeof create_context>>>, 'actions'>} Context */
 /** @typedef {(state: State, action: Type.Action) => State} Reducer */
 /** @typedef {(context: Context) => void} Observer */
 /** @typedef {(state: State, context: Context, delta: number) => void} Ticker */
-/** @typedef {(modules?: typeof GAME_MODULES) => { name: string, reduce?: Reducer, observe?: Observer, tick?: Ticker }} Module */
+/** @typedef {(module_params: {world?: World, modules?: any}) => { name: string, reduce?: Reducer, observe?: Observer, tick?: Ticker }} Module */
 /** @typedef {import("three").AnimationAction} AnimAction */
 
 export const INITIAL_STATE = {
@@ -99,10 +104,8 @@ export const INITIAL_STATE = {
     dance: false,
   },
 
-  // the player's position is in the world's entities list
-  // but we keep this one for access in the UI
-  // it is updated by the player_movement module every 100ms
-  position: new Vector3(),
+  /** @type {Type.Entity} */
+  player: null,
   characters_limit: 3,
   characters: [
     {
@@ -127,14 +130,7 @@ const PERMANENT_MODULES = [
 
 const GAME_MODULES = {
   MENU: [main_menu, player_characters],
-  GAME: [
-    ui_settings,
-    entity_add,
-    player_movement,
-    game_lights,
-    game_camera,
-    game_map,
-  ],
+  GAME: [ui_settings, game_lights, player_movement, game_camera, game_world],
 }
 
 function last_event_value(emitter, event, default_value = null) {
@@ -145,17 +141,16 @@ function last_event_value(emitter, event, default_value = null) {
   return () => value
 }
 
-function create_context({ send_packet, connect_ws }) {
+async function create_context({ send_packet, connect_ws }) {
   const scene = new Scene()
-
+  const world = new World(new Vector3(0, -GRAVITY, 0))
   // scene.background = new Color('#E0E0E0')
   scene.fog = new Fog(0x263238 / 2, 20, 70)
 
-  const world = new World({ scene })
+  const chunks = await initialize_chunks(world)
   const renderer = new WebGLRenderer()
-  const composer = new EffectComposer(renderer)
 
-  composer.setSize(window.innerWidth, window.innerHeight)
+  const Pool = await create_pools({ scene, world })
 
   renderer.setPixelRatio(window.devicePixelRatio)
   renderer.setSize(window.innerWidth, window.innerHeight)
@@ -163,6 +158,9 @@ function create_context({ send_packet, connect_ws }) {
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = VSMShadowMap
   renderer.outputColorSpace = SRGBColorSpace
+
+  const composer = new EffectComposer(renderer)
+  composer.setSize(window.innerWidth, window.innerHeight)
 
   const camera = new PerspectiveCamera(
     75, // Field of view
@@ -180,9 +178,9 @@ function create_context({ send_packet, connect_ws }) {
   /** @type {() => State} */
   const get_state = last_event_value(events, 'STATE_UPDATED', INITIAL_STATE)
   return {
-    world,
     events,
     actions,
+    Pool,
     composer,
     /** @type {import("aresrpg-protocol/src/types").create_client['send']} */
     send_packet,
@@ -199,6 +197,8 @@ function create_context({ send_packet, connect_ws }) {
     scene,
     renderer,
     camera,
+    world,
+    chunks,
     /** @type {AbortSignal} */
     signal: new AbortController().signal,
   }
@@ -209,28 +209,29 @@ export default async function create_game({
   send_packet,
   connect_ws,
 }) {
-  const { actions, ...context } = create_context({ send_packet, connect_ws })
+  const { actions, ...context } = await create_context({
+    send_packet,
+    connect_ws,
+  })
   const {
     events,
+    world,
     scene,
     renderer,
     get_state,
     camera,
     dispatch,
-    world,
     composer,
   } = context
 
-  add_pools_to_scene(scene)
-
-  const permanent_modules = PERMANENT_MODULES.map(create => create())
+  const permanent_modules = PERMANENT_MODULES.map(create => create({ world }))
   const game_modules = Object.fromEntries(
     Object.entries(GAME_MODULES).map(([key, modules]) => [
       key,
-      modules.map(create => create()),
+      modules.map(create => create({ world })),
     ]),
   )
-  const modules_loader = create_modules_loader(game_modules)
+  const modules_loader = create_modules_loader({ modules: game_modules })
 
   permanent_modules
     .map(({ observe }) => observe)
@@ -290,15 +291,16 @@ export default async function create_game({
         const state = get_state()
         const delta_seconds = game_delta / 1000
 
-        world.step(state)
+        world.step()
+
         permanent_modules
           .map(({ tick }) => tick)
           .filter(Boolean)
           .forEach(tick => tick(state, context, delta_seconds))
 
         modules_loader.tick(state, context, delta_seconds)
-        renderer.render(scene, camera)
-        // composer.render()
+        // renderer.render(scene, camera)
+        composer.render()
 
         last_frame_time = current_time - (real_delta % frame_duration)
 
@@ -317,7 +319,6 @@ export default async function create_game({
 
   return {
     events,
-    world,
     dispatch,
     send_packet,
     start(container) {

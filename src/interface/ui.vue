@@ -24,7 +24,6 @@
 import { onMounted, onUnmounted, inject, computed, ref } from 'vue'
 
 import { PLAYER_ID } from '../game.js'
-import World from '../world.js'
 import pkg from '../../package.json'
 
 const ws_status = inject('ws_status')
@@ -32,9 +31,12 @@ const state = inject('state')
 const game = inject('game')
 const escape_menu_open = ref(false)
 
-const position = computed(() =>
-  state.value.position.toArray().map(v => Math.round(v)),
-)
+const position = computed(() => {
+  if (!state.value.player) return [0, 0, 0]
+  const { position } = state.value.player
+  const { x, y, z } = position()
+  return [Math.round(x), Math.round(y), Math.round(z)]
+})
 
 function on_escape({ key }) {
   if (key === 'Escape') {

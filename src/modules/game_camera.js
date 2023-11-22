@@ -19,11 +19,11 @@ export default function () {
 
   return {
     name: 'game_camera',
-    tick(_, { camera, world }) {
-      const player = world.entities.get(PLAYER_ID)
+    tick({ player }, { camera }) {
       if (!player) return
 
-      const { position, height } = player
+      const { height } = player
+      const position = player.position()
 
       // Calculate the offset position from the player using spherical coordinates
       const offset_x =

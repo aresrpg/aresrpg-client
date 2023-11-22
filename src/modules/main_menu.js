@@ -13,15 +13,10 @@ import {
 } from 'three'
 import { N8AOPass } from 'n8ao'
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js'
-import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js'
-import { SSAARenderPass } from 'three/examples/jsm/postprocessing/SSAARenderPass.js'
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 
 import Grass from '../grass/grass.js'
 import manracni from '../assets/manracni.mp3'
-import Pool from '../pool.js'
 import dispose from '../utils/dispose.js'
 
 const grass = new Grass(30, 100000)
@@ -37,25 +32,26 @@ sound.setVolume(0.5)
 
 /** @type {Type.Module} */
 export default function () {
-  const entity = Pool.guard.get()
-  const {
-    body,
-    animations: { IDLE, mixer },
-  } = entity
-
   let camera_moving = false
   const camera_target_position = new Vector3()
   let lerp_factor = 0
+  let mixer = null
 
   return {
     name: 'main_menu',
-    observe({ scene, signal, camera, connect_ws, composer, events }) {
-      scene.add(grass)
+    observe({ scene, signal, camera, Pool, composer, events }) {
       camera.position.set(-1, 2, 7)
       camera.lookAt(0, 0, 1)
       camera.add(listener)
 
       sound.play()
+
+      const entity = Pool.guard.get()
+      const {
+        animations: { IDLE, mixer: animation_mixer },
+      } = entity
+
+      mixer = animation_mixer
 
       const spot = new SpotLight(0xffffff, 1, 0, Math.PI / 2, 1, 2)
 
@@ -77,48 +73,27 @@ export default function () {
 
       const amblight = new AmbientLight('#ffffff', 3)
 
-      const helper = new DirectionalLightHelper(light, 10, '#ff0000')
-      const spothelper = new SpotLightHelper(spot, '#ff0000')
-
       scene.add(light)
       scene.add(spot)
       scene.add(amblight)
-      // scene.add(helper)
-      // scene.add(spothelper)
+      scene.add(grass)
 
+      const renderpass = new RenderPass(scene, camera)
+      const smaapass = new SMAAPass(window.innerWidth, window.innerHeight)
       const n8aopass = new N8AOPass(
         scene,
         camera,
         window.innerWidth,
         window.innerHeight,
       )
-      const renderpass = new RenderPass(scene, camera)
-      const smaapass = new SMAAPass(window.innerWidth, window.innerHeight)
-      const pixelpass = new RenderPixelatedPass(4, scene, camera)
-      const bloomPass = new UnrealBloomPass(
-        new Vector2(window.innerWidth, window.innerHeight),
-        0.5,
-        0,
-        0.95,
-      )
-      const outputpass = new OutputPass()
-      const ssaapass = new SSAARenderPass(scene, camera, 0xaaaaaa, 0)
-
-      n8aopass.configuration.gammaCorrection = false
-
       composer.addPass(renderpass)
-      // composer.addPass(ssaapass)
-      // composer.addPass(n8aopass)
-      // composer.addPass(bloomPass)
-      // composer.addPass(pixelpass)
-      // composer.addPass(smaapass)
-      // composer.addPass(outputpass)
+      composer.addPass(n8aopass)
+      composer.addPass(smaapass)
 
-      entity.body.position.set(1, 1.5, 5)
-      entity.body.rotation.y = -0.8
-
-      entity.body.collider.visible = false
-      // entity.body.visualizer.visible = false
+      entity.move(new Vector3(0.5, 1.2, 5.3))
+      entity.three_body.rotation.y = -0.8
+      // @ts-ignore
+      entity.three_body.collider.visible = false
 
       IDLE.play()
 
@@ -130,15 +105,23 @@ export default function () {
 
       signal.addEventListener('abort', () => {
         sound.stop()
+
         composer.removePass(renderpass)
+        composer.removePass(n8aopass)
+        composer.removePass(smaapass)
+
         dispose(grass)
+
         entity.remove()
         scene.remove(grass)
+        scene.remove(light)
+        scene.remove(spot)
+        scene.remove(amblight)
       })
     },
     tick(state, { camera }, delta) {
       grass.update(delta)
-      mixer.update(delta)
+      mixer?.update(delta)
 
       if (camera_moving) {
         lerp_factor += delta * 0.1 // Adjust the 0.5 value to control the speed

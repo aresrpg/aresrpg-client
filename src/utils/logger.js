@@ -44,4 +44,9 @@ export default {
     strong: '#4CAF50',
     light: '#A5D6A7',
   }),
+  ASSET: logger({
+    header: 'asset',
+    strong: '#F44336',
+    light: '#EF9A9A',
+  }),
 }

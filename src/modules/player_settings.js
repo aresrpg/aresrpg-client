@@ -51,30 +51,6 @@ export default function () {
               show_entities_collider: payload,
             },
           }
-        case 'action/show_terrain_volume':
-          return {
-            ...state,
-            settings: {
-              ...state.settings,
-              show_terrain_volume: payload,
-            },
-          }
-        case 'action/show_entities_volume':
-          return {
-            ...state,
-            settings: {
-              ...state.settings,
-              show_entities_volume: payload,
-            },
-          }
-        case 'action/volume_depth':
-          return {
-            ...state,
-            settings: {
-              ...state.settings,
-              volume_depth: Math.max(1, Math.min(20, payload)),
-            },
-          }
         case 'action/show_terrain':
           return {
             ...state,

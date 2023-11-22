@@ -35,7 +35,7 @@ export const fragmentShader = /* glsl */ `
   varying vec2 vUv;
   varying vec3 vNormal;
 
-  vec3 green = vec3(0.2, 0.6, 0.3);
+  vec3 green = vec3(0.463,1.,0.012);
 
   void main() {
     vec3 color = mix(green * 0.7, green, vPosition.y);

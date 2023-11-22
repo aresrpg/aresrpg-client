@@ -1,4 +1,5 @@
 import { on } from 'events'
+// @ts-ignore
 import { setInterval } from 'timers/promises'
 
 import { aiter } from 'iterator-helper'
@@ -24,7 +25,7 @@ import { abortable } from '../utils/iterator'
 
 const SPEED = 5
 const JUMP_FORCE = 13
-
+const CONTROLLER_OFFSET = 0.01
 const ASCENT_GRAVITY_FACTOR = 3
 const APEX_GRAVITY_FACTOR = 0.3
 const DESCENT_GRAVITY_FACTOR = 5
@@ -65,20 +66,6 @@ const play_step_sound = throttle(() => {
   step_audio.play()
 }, 310)
 
-// last_positions are the latest state of positions the server or client wanted to enforce
-// if the last wanted position becomes outdated, the entity will be moved to the latest position
-function handle_entity_positions(entities, last_positions) {
-  for (const entity of entities.values()) {
-    if (
-      entity.target_position &&
-      !last_positions.get(entity)?.equals(entity.target_position)
-    ) {
-      entity.position.copy(entity.target_position)
-      last_positions.set(entity, entity.position.clone())
-    }
-  }
-}
-
 function fade_to_animation(from, to, duration) {
   if (from !== to) {
     from.fadeOut(duration)
@@ -93,7 +80,6 @@ function compute_and_play_animation({
   inputs,
   animations,
   jump_state,
-  distance_from_ground,
 }) {
   if (current_animation === animations.RUN) play_step_sound()
 
@@ -125,10 +111,8 @@ function compute_and_play_animation({
     current_animation !== animations.FALLING &&
     current_animation !== animations.JUMP
   ) {
-    const animation =
-      distance_from_ground > 5 ? animations.FALLING : animations.RUN
-    fade_to_animation(current_animation, animation, 0.5)
-    return animation
+    fade_to_animation(current_animation, animations.FALLING, 0.5)
+    return animations.FALLING
   }
 
   if (on_ground && inputs.dance && current_animation !== animations.DANCE) {
@@ -138,12 +122,18 @@ function compute_and_play_animation({
 }
 
 /** @type {Type.Module} */
-export default function () {
+export default function ({ world }) {
   const velocity = new Vector3()
-  const controller = null
+  const controller = world.createCharacterController(CONTROLLER_OFFSET)
   const model_forward = new Vector3(0, 0, 1)
 
-  const last_corrected_movement = new Vector3()
+  controller.enableAutostep(0.7, 0.3, true)
+  // Don’t allow climbing slopes larger than 45 degrees.
+  controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180)
+  // Automatically slide down on slopes smaller than 30 degrees.
+  controller.setMinSlopeSlideAngle((30 * Math.PI) / 180)
+  controller.enableSnapToGround(0.7)
+
   let jump_state = jump_states.NONE
   let jump_cooldown = 0
   let current_animation = null
@@ -151,12 +141,14 @@ export default function () {
 
   return {
     name: 'player_movements',
-    tick({ inputs }, { camera, world }, delta) {
-      const player = world.entities.get(PLAYER_ID)
-
+    tick({ inputs, player }, { camera }, delta) {
       if (!player) return
 
-      const { animations, position } = player
+      const {
+        animations,
+        rapier_body: { collider, rigid_body },
+      } = player
+      const position = player.position()
       const camera_forward = new Vector3(0, 0, -1)
         .applyQuaternion(camera.quaternion)
         .setY(0)
@@ -172,11 +164,17 @@ export default function () {
         current_animation.play()
       }
 
+      if (player.target_position) {
+        player.move(player.target_position)
+        player.target_position = null
+        return
+      }
+
       // Avoid falling to hell
       // TODO: tp to nether if falling to hell
       if (position.y <= -30) {
         velocity.setScalar(0)
-        player.position.set(0, 20, 0)
+        player.move(new Vector3(0, 20, 0))
         return
       }
 
@@ -240,21 +238,21 @@ export default function () {
         case jump_states.NONE:
         default:
           // if not jumping, apply normal gravity
-          if (on_ground) velocity.y = -GRAVITY * delta
-          else velocity.y -= GRAVITY * delta
+          velocity.y -= GRAVITY * delta
       }
 
       movement.addScaledVector(velocity, delta)
 
-      const { corrected_movement, is_on_ground, distance_from_ground } =
-        world.correct_movement(player, movement)
+      controller.computeColliderMovement(collider, movement)
+      on_ground = controller.computedGrounded()
 
-      const manual_input =
-        inputs.forward || inputs.backward || inputs.left || inputs.right
-      const is_moving_horizontally =
-        !!corrected_movement.clone().setY(0).lengthSq() && manual_input
+      const { x, y, z } = controller.computedMovement()
+      const corrected_movement = new Vector3(x, y, z)
 
-      on_ground = is_on_ground
+      const is_moving_horizontally = !!corrected_movement
+        .clone()
+        .setY(0)
+        .lengthSq()
 
       if (is_moving_horizontally) {
         // Use lengthSq for efficiency, as we're only checking for non-zero length
@@ -265,7 +263,7 @@ export default function () {
           model_forward,
           flat_movement,
         )
-        player.body.quaternion.slerp(quaternion, 0.2)
+        player.three_body.quaternion.slerp(quaternion, 0.2)
       }
 
       const next_animation = compute_and_play_animation({
@@ -275,42 +273,25 @@ export default function () {
         inputs,
         animations,
         jump_state,
-        distance_from_ground,
       })
 
       if (next_animation) current_animation = next_animation
-
-      player.position.add(corrected_movement)
+      const new_position = new Vector3(
+        position.x + corrected_movement.x,
+        position.y + corrected_movement.y,
+        position.z + corrected_movement.z,
+      )
+      player.move(new_position)
       animations.mixer.update(delta)
     },
-    reduce(state, { type, payload }) {
-      if (type === 'action/set_state_player_position') {
-        return {
-          ...state,
-          position: payload,
-        }
-      }
-      return state
-    },
-    observe({ events, world, signal, dispatch }) {
-      events.on('entity_position', ({ id, position }) => {
-        const entity = world.entities.get(id)
-        const [x, y, z] = position
-        if (entity) entity.target_position.set(x, y, z)
-      })
-
+    observe({ events, world, signal, dispatch, get_state }) {
       events.on('player_position', position => {
+        const state = get_state()
+        if (!state.player) return
+
+        const { player } = state
         const [x, y, z] = position
-        const player = world.entities.get(PLAYER_ID)
-        if (player) player.target_position.set(x, y, z)
-      })
-
-      aiter(abortable(setInterval(100, null, { signal }))).forEach(() => {
-        // every 100ms, update the position in the state (for UI)
-        const player = world.entities.get(PLAYER_ID)
-        if (!player) return
-
-        dispatch('action/set_state_player_position', player.position)
+        player.target_position.set(x, y, z)
       })
     },
   }

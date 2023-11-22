@@ -23,16 +23,21 @@ declare namespace Type {
   type GameState = 'MENU' | 'GAME'
 
   type Entity = {
-    body: import('three').Object3D
+    id: string
+    three_body: import('three').Object3D
+    rapier_body: {
+      rigid_body: import('@dimforge/rapier3d').RigidBody
+      collider: import('@dimforge/rapier3d').Collider
+    }
     height: number
     radius: number
-    segment: import('three').Line3
     animations: {
       mixer: import('three').AnimationMixer
       [clip: string]: import('three').AnimationAction
     }
-    position: import('three').Vector3
+    position: () => import('@dimforge/rapier3d').Vector
     target_position: import('three').Vector3
+    move: (vector: import('three').Vector3) => void
     remove: () => void
   }
 
@@ -51,7 +56,7 @@ declare namespace Type {
     'action/keydown': string
     'action/keyup': string
     'action/load_game_state': GameState
-    'action/set_state_player_position': Position
+    'action/register_player': Entity
   } & Packets
 
   type Events = import('aresrpg-protocol/src/types').TypedEmitter<
