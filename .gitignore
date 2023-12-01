@@ -7,3 +7,4 @@ dist-ssr
 .vscode
 types
 .vercel
+.env*.local
