@@ -10,6 +10,12 @@ export default function () {
           characters_limit: payload.limit,
         }
       }
+      if (type === 'action/select_character') {
+        return {
+          ...state,
+          selected_character_id: payload,
+        }
+      }
       return state
     },
   }

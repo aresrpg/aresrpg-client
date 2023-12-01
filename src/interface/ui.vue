@@ -15,48 +15,49 @@
     .map
 
   .escape_menu(v-if="escape_menu_open")
-    .keys.ares_btn.disabled(@click="on_menu_controls_btn") Controls
-    .quit.ares_btn(@click="on_menu_quit_btn") Change Character
+    vs-button.keys.disabled(@click="on_menu_controls_btn" type="shadow") Controls
+    vs-button.quit(@click="on_menu_quit_btn" type="shadow") Change Character
 
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, inject, computed, ref } from 'vue'
+import { onMounted, onUnmounted, inject, computed, ref } from 'vue';
 
-import { PLAYER_ID } from '../game.js'
-import pkg from '../../package.json'
+import { PLAYER_ID } from '../game.js';
+import pkg from '../../package.json';
 
-const ws_status = inject('ws_status')
-const state = inject('state')
-const game = inject('game')
-const escape_menu_open = ref(false)
+const ws_status = inject('ws_status');
+const state = inject('state');
+const game = inject('game');
+const escape_menu_open = ref(false);
 
 const position = computed(() => {
-  if (!state.value.player) return [0, 0, 0]
-  const { position } = state.value.player
-  const { x, y, z } = position()
-  return [Math.round(x), Math.round(y), Math.round(z)]
-})
+  if (!state.value.player) return [0, 0, 0];
+  const { position } = state.value.player;
+  const { x, y, z } = position();
+  return [Math.round(x), Math.round(y), Math.round(z)];
+});
 
 function on_escape({ key }) {
   if (key === 'Escape') {
-    escape_menu_open.value = !escape_menu_open.value
+    escape_menu_open.value = !escape_menu_open.value;
   }
 }
 
 function on_menu_quit_btn() {
-  game.value.dispatch('action/load_game_state', 'MENU')
+  game.value.send_packet('packet/leaveGame', {});
+  game.value.dispatch('action/load_game_state', 'MENU');
 }
 
 function on_menu_controls_btn() {}
 
 onMounted(() => {
-  window.addEventListener('keydown', on_escape)
-})
+  window.addEventListener('keydown', on_escape);
+});
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', on_escape)
-})
+  window.removeEventListener('keydown', on_escape);
+});
 </script>
 
 <style lang="stylus" scoped>

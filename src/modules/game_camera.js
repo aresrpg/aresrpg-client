@@ -10,12 +10,12 @@ import { PLAYER_ID } from '../game'
 const CAMERA_MIN_POLAR_ANGLE = 0
 const CAMERA_MAX_POLAR_ANGLE = Math.PI * 0.5 * 0.7 //  70% of the half PI
 const CAMERA_MIN_ZOOM = 4
-const CAMERA_MAX_ZOOM = 15
+const CAMERA_MAX_ZOOM = 10
 
 /** @type {import("../game").Module} */
 export default function () {
   const camera_rotation = new Vector3(0.8, 0, 0)
-  let spherical_radius = 10
+  let spherical_radius = 4
 
   return {
     name: 'game_camera',

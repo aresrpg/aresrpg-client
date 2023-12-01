@@ -1,0 +1,7 @@
+semi: false
+singleQuote: true
+arrowParens: avoid
+overrides:
+  - files: '*.vue'
+    options:
+      semi: true

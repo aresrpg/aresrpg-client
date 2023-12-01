@@ -1,13 +1,16 @@
-import { Audio, AudioListener, AudioLoader } from 'three'
+import { Audio, AudioListener, AudioLoader, Quaternion, Vector3 } from 'three'
 
 import pandala from '../assets/pandala.wav'
 import { PLAYER_ID } from '../game.js'
+import { compute_animation_state } from '../utils/animation.js'
 
 const make_chunk_key = (x, z) => `${x}:${z}`
 
 const listener = new AudioListener()
 const sound = new Audio(listener)
 const audio_loader = new AudioLoader()
+
+const MOVE_UPDATE_INTERVAL = 0.1
 
 const audio_buffer = await audio_loader.loadAsync(pandala)
 
@@ -24,21 +27,67 @@ export default function () {
   const entities = new Map()
   return {
     name: 'game_world',
-    tick({
-      player,
-      settings: {
-        show_terrain_collider,
-        show_terrain,
-        show_entities_collider,
-        show_entities,
-        debug_mode,
+    tick(
+      {
+        player,
+        settings: {
+          show_terrain_collider,
+          show_terrain,
+          show_entities_collider,
+          show_entities,
+          debug_mode,
+        },
       },
-    }) {
+      _,
+      delta,
+    ) {
+      // handle entities movement
       for (const entity of entities.values()) {
+        if (entity.is_jumping == null) entity.is_jumping = 0
+        entity.is_jumping = Math.max(0, entity.is_jumping - delta)
+
         if (entity.target_position) {
-          entity.move(entity.target_position)
-          entity.target_position = null
-        }
+          const lerp_factor = Math.min(delta / MOVE_UPDATE_INTERVAL, 1)
+          const new_position = new Vector3().lerpVectors(
+            entity.position(),
+            entity.target_position,
+            lerp_factor,
+          )
+
+          entity.move(new_position)
+
+          const movement = new Vector3().subVectors(
+            entity.target_position,
+            new_position,
+          )
+
+          entity.rotate(movement)
+          entity.is_dancing = false
+
+          const is_moving_horizontally = movement.setY(0).lengthSq() > 0.001
+
+          if (new_position.distanceTo(entity.target_position) < 0.01)
+            entity.target_position = null
+
+          entity.animate(
+            compute_animation_state({
+              is_jumping: entity.is_jumping,
+              is_on_ground: !entity.is_jumping,
+              is_moving_horizontally,
+              is_dancing: false,
+            }),
+            delta,
+          )
+        } else
+          entity.animate(
+            compute_animation_state({
+              is_jumping: entity.is_jumping,
+              is_on_ground: !entity.is_jumping,
+              is_moving_horizontally: false,
+              is_dancing: entity.is_dancing,
+            }),
+            delta,
+          )
       }
 
       if (!debug_mode) return
@@ -85,16 +134,16 @@ export default function () {
       }
       return state
     },
-    observe({ events, signal, scene, dispatch, chunks, Pool }) {
+    observe({ events, signal, scene, dispatch, chunks, Pool, send_packet }) {
       events.once('STATE_UPDATED', () => {
         sound.play()
-        const player = Pool.guard.get()
+        const player = Pool.guard.get({ add_rigid_body: true })
 
         player.three_body.position.setScalar(0)
 
         dispatch('action/register_player', {
-          id: PLAYER_ID,
           ...player,
+          id: PLAYER_ID,
         })
 
         signal.addEventListener('abort', () => {
@@ -103,10 +152,27 @@ export default function () {
         })
       })
 
-      events.on('entity_position', ({ id, position }) => {
+      events.on('packet/entitySpawn', ({ id, position, type }) => {
+        if (type === 0) {
+          const entity = Pool.guard.get()
+          entity.id = id
+          entity.move(position)
+          entities.set(id, entity)
+        }
+      })
+
+      events.on('packet/entityDespawn', ({ id }) => {
         const entity = entities.get(id)
-        const [x, y, z] = position
-        if (entity) entity.target_position.set(x, y, z)
+        if (entity) {
+          entity.remove()
+          entities.delete(id)
+        }
+      })
+
+      events.on('packet/entityMove', ({ id, position }) => {
+        const entity = entities.get(id)
+        const { x, y, z } = position
+        if (entity) entity.target_position = new Vector3(x, y, z)
       })
 
       events.on('packet/chunkLoad', ({ position: { x, z } }) => {
@@ -136,6 +202,25 @@ export default function () {
           { once: true },
         )
       })
+
+      events.on('packet/entityAction', ({ id, action }) => {
+        const entity = entities.get(id)
+        if (entity) {
+          switch (action) {
+            case 0: // jump
+              entity.is_jumping = 0.5
+              break
+            case 1: // dance
+              entity.is_dancing = true
+              break
+            default:
+              break
+          }
+        }
+      })
+
+      // notify the server that we are ready to receive chunks and more
+      send_packet('packet/joinGameReady', {})
     },
   }
 }

@@ -13,15 +13,11 @@ import {
   Vector3,
 } from 'three'
 import { lerp } from 'three/src/math/MathUtils.js'
+import { get } from '@vueuse/core'
 
-import step1 from '../assets/step1.ogg'
-import step2 from '../assets/step2.ogg'
-import step3 from '../assets/step3.ogg'
-import step4 from '../assets/step4.ogg'
-import step5 from '../assets/step5.ogg'
-import step6 from '../assets/step6.ogg'
 import { GRAVITY, PLAYER_ID } from '../game.js'
 import { abortable } from '../utils/iterator'
+import { compute_animation_state } from '../utils/animation.js'
 
 const SPEED = 5
 const JUMP_FORCE = 13
@@ -39,38 +35,13 @@ const jump_states = {
   NONE: 'NONE',
 }
 
-const throttle = (action, interval) => {
-  let last_time = 0
-  return (...args) => {
-    const now = Date.now()
-    if (now - last_time >= interval) {
-      last_time = now
-      action(...args)
-    }
-  }
-}
-
-const step_audios = [
-  new Audio(step1),
-  new Audio(step2),
-  new Audio(step3),
-  new Audio(step4),
-  new Audio(step5),
-  new Audio(step6),
-]
-
-const random_element = arr => arr[Math.floor(Math.random() * arr.length)]
-const play_step_sound = throttle(() => {
-  const step_audio = random_element(step_audios)
-  step_audio.currentTime = 0
-  step_audio.play()
-}, 310)
-
-function fade_to_animation(from, to, duration) {
-  if (from !== to) {
-    from.fadeOut(duration)
-    to.reset().fadeIn(duration).play()
-  }
+function rounded_position(position) {
+  const factor = Math.pow(10, 5)
+  return new Vector3()
+    .copy(position)
+    .multiplyScalar(factor)
+    .round()
+    .divide(factor)
 }
 
 function compute_and_play_animation({
@@ -81,8 +52,6 @@ function compute_and_play_animation({
   animations,
   jump_state,
 }) {
-  if (current_animation === animations.RUN) play_step_sound()
-
   if (on_ground) {
     if (is_moving_horizontally && current_animation !== animations.RUN) {
       fade_to_animation(current_animation, animations.RUN, 0.3)
@@ -127,7 +96,7 @@ export default function ({ world }) {
   const controller = world.createCharacterController(CONTROLLER_OFFSET)
   const model_forward = new Vector3(0, 0, 1)
 
-  controller.enableAutostep(0.7, 0.3, true)
+  controller.enableAutostep(0.7, 0.3, false)
   // Don’t allow climbing slopes larger than 45 degrees.
   controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180)
   // Automatically slide down on slopes smaller than 30 degrees.
@@ -136,12 +105,14 @@ export default function ({ world }) {
 
   let jump_state = jump_states.NONE
   let jump_cooldown = 0
-  let current_animation = null
-  let on_ground = false
+  const current_animation = null
+  let on_ground = 0
+
+  let is_dancing = false
 
   return {
     name: 'player_movements',
-    tick({ inputs, player }, { camera }, delta) {
+    tick({ inputs, player }, { camera, send_packet }, delta) {
       if (!player) return
 
       const {
@@ -157,12 +128,6 @@ export default function ({ world }) {
         .applyQuaternion(camera.quaternion)
         .setY(0)
         .normalize()
-
-      if (!current_animation) {
-        // @ts-ignore
-        current_animation = animations.IDLE
-        current_animation.play()
-      }
 
       if (player.target_position) {
         player.move(player.target_position)
@@ -205,6 +170,8 @@ export default function ({ world }) {
           jump_state = jump_states.ASCENT
           jump_cooldown = JUMP_COOLDWON
           on_ground = false
+
+          send_packet('packet/entityAction', { id: '', action: 'JUMP' })
         } else {
           jump_state = jump_states.NONE
 
@@ -249,50 +216,70 @@ export default function ({ world }) {
       const { x, y, z } = controller.computedMovement()
       const corrected_movement = new Vector3(x, y, z)
 
-      const is_moving_horizontally = !!corrected_movement
-        .clone()
-        .setY(0)
-        .lengthSq()
+      const is_moving_horizontally =
+        corrected_movement.clone().setY(0).lengthSq() > 0.001
 
-      if (is_moving_horizontally) {
-        // Use lengthSq for efficiency, as we're only checking for non-zero length
-        const flat_movement = movement.clone().setY(0).normalize()
-
-        // Calculate the target quaternion: this rotates modelForward to align with flatMovement
-        const quaternion = new Quaternion().setFromUnitVectors(
-          model_forward,
-          flat_movement,
-        )
-        player.three_body.quaternion.slerp(quaternion, 0.2)
+      if (inputs.dance && !is_dancing) {
+        is_dancing = true
+        send_packet('packet/entityAction', { id: '', action: 'DANCE' })
       }
 
-      const next_animation = compute_and_play_animation({
-        current_animation,
-        on_ground,
+      if (is_moving_horizontally) {
+        player.rotate(corrected_movement)
+        is_dancing = false
+      }
+
+      const animation_name = compute_animation_state({
+        is_jumping: jump_state === jump_states.ASCENT,
+        is_on_ground: on_ground,
         is_moving_horizontally,
-        inputs,
-        animations,
-        jump_state,
+        is_dancing: inputs.dance,
       })
 
-      if (next_animation) current_animation = next_animation
       const new_position = new Vector3(
         position.x + corrected_movement.x,
         position.y + corrected_movement.y,
         position.z + corrected_movement.z,
       )
-      player.move(new_position)
-      animations.mixer.update(delta)
-    },
-    observe({ events, world, signal, dispatch, get_state }) {
-      events.on('player_position', position => {
-        const state = get_state()
-        if (!state.player) return
 
-        const { player } = state
-        const [x, y, z] = position
-        player.target_position.set(x, y, z)
-      })
+      if (new_position.distanceToSquared(position) > 0.001) {
+        player.move(new_position)
+        player.animate(animation_name, delta)
+      } else player.animate(inputs.dance ? 'DANCE' : 'IDLE', delta)
+    },
+    reduce(state, { type, payload }) {
+      if (type === 'packet/playerPosition') {
+        return {
+          ...state,
+          player: {
+            ...state.player,
+            target_position: payload.position,
+          },
+        }
+      }
+      return state
+    },
+    observe({ events, world, signal, dispatch, get_state, send_packet }) {
+      aiter(abortable(setInterval(50, null, { signal }))).reduce(
+        last_position => {
+          const { player } = get_state()
+
+          if (!player) return last_position
+
+          const position = player.position()
+          const { x, y, z } = position
+
+          if (
+            last_position.x !== x ||
+            last_position.y !== y ||
+            last_position.z !== z
+          )
+            send_packet('packet/playerPosition', { position })
+
+          return position
+        },
+        new Vector3(),
+      )
     },
   }
 }

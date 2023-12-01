@@ -15,7 +15,6 @@ const ADD_FUNCTIONS = [
   'on',
   'once',
   'addListener',
-  'addEventListener',
   'prependListener',
   'prependOnceListener',
 ]
@@ -31,7 +30,11 @@ function events_interceptor(emitter) {
     get: function (target, property, receiver) {
       const original_property = Reflect.get(target, property, receiver)
 
-      if (typeof property === 'string' && ADD_FUNCTIONS.includes(property)) {
+      const add_functions = is_event_target(emitter)
+        ? [...ADD_FUNCTIONS, 'addEventListener']
+        : ADD_FUNCTIONS
+
+      if (typeof property === 'string' && add_functions.includes(property)) {
         return function (event_name, listener) {
           listener_array.push({ event_name, listener })
           return original_property.call(target, event_name, listener)

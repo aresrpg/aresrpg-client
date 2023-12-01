@@ -48,6 +48,10 @@ const FILTER_ACTION_IN_LOGS = [
   'action/keyup',
   'action/set_state_player_position',
 ]
+export const FILTER_PACKET_IN_LOGS = [
+  'packet/playerPosition',
+  'packet/entityMove',
+]
 
 LOADING_MANAGER.onStart = (url, itemsLoaded, itemsTotal) => {
   window.dispatchEvent(new Event('assets_loading'))
@@ -106,6 +110,7 @@ export const INITIAL_STATE = {
 
   /** @type {Type.Entity} */
   player: null,
+  selected_character_id: null,
   characters_limit: 3,
   characters: [
     {
@@ -126,10 +131,11 @@ const PERMANENT_MODULES = [
   player_settings,
   game_sky,
   game_connect,
+  player_characters,
 ]
 
 const GAME_MODULES = {
-  MENU: [main_menu, player_characters],
+  MENU: [main_menu],
   GAME: [ui_settings, game_lights, player_movement, game_camera, game_world],
 }
 
@@ -163,10 +169,10 @@ async function create_context({ send_packet, connect_ws }) {
   composer.setSize(window.innerWidth, window.innerHeight)
 
   const camera = new PerspectiveCamera(
-    75, // Field of view
+    60, // Field of view
     window.innerWidth / window.innerHeight, // Aspect ratio
     0.1, // Near clipping plane
-    1000, // Far clipping plane
+    100, // Far clipping plane
   )
 
   camera.far = 100
@@ -261,7 +267,8 @@ export default async function create_game({
         if (action.type.includes('action/')) {
           if (!FILTER_ACTION_IN_LOGS.includes(action.type))
             logger.INTERNAL(action.type, action.payload)
-        } else logger.NETWORK_IN(action.type, action.payload)
+        } else if (!FILTER_PACKET_IN_LOGS.includes(action.type))
+          logger.NETWORK_IN(action.type, action.payload)
         events.emit(action.type, action.payload)
         events.emit('STATE_UPDATED', state)
         return state

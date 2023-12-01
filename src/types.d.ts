@@ -31,13 +31,11 @@ declare namespace Type {
     }
     height: number
     radius: number
-    animations: {
-      mixer: import('three').AnimationMixer
-      [clip: string]: import('three').AnimationAction
-    }
-    position: () => import('@dimforge/rapier3d').Vector
+    position: () => import('three').Vector3
     target_position: import('three').Vector3
     move: (vector: import('three').Vector3) => void
+    rotate: (vector: import('three').Vector3) => void
+    animate: () => void
     remove: () => void
   }
 
@@ -57,6 +55,7 @@ declare namespace Type {
     'action/keyup': string
     'action/load_game_state': GameState
     'action/register_player': Entity
+    'action/select_character': string
   } & Packets
 
   type Events = import('aresrpg-protocol/src/types').TypedEmitter<

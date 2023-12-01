@@ -5,7 +5,12 @@
     .version build {{ pkg.version }}
   .menu_play(v-if="menu_type === 'PLAY'")
     img.logo(:src="text_logo")
-    .play.ares_btn(@click="play_as_guest") Play as guest
+    .btns
+      .ares_btn(v-if="!is_logged" @click="open_app" ) Login
+      .ares_btn(v-else @click="play" :class="{ disabled: play_button_disabled}") Play
+      .sub
+        .discord.ares_btn(@click="open_discord") Discord
+        .twitter.ares_btn(@click="open_twitter") Twitter
   .menu_characters(v-if="menu_type === 'CHARACTERS'")
     .character(v-for="character in state.characters" @click="() => select_character(character)")
       .skin
@@ -18,84 +23,141 @@
       )
       .skin
       .grad
-      fa(:icon="['fas', 'plus']")
+      i.bx.bx-plus.bx-md
   .menu_create_character(v-if="menu_type === 'CREATE_CHARACTER'")
     .slider
     .desc
     .perso
     .spells
-    input.name(placeholder="Enter your name" v-model="name")
-    .back.ares_btn(@click="show_characters_menu") Cancel
-    .play.ares_btn(@click="create_character") Create
+    vs-input.name(block placeholder="Enter your name" v-model="name" @keyup.enter="create_character")
+      template(#message-danger v-if="name_error") {{ name_error }}
+    vs-button.back(type="shadow" color="#2ECC71" @click="show_characters_menu") Cancel
+    vs-button.play(:class=`{ disabled: name_error || name_too_short || name_too_long || name_invalid }` type="shadow" color="#2ECC71" @click="create_character") Create
 </template>
 
 <script setup>
-import { inject, onUnmounted, onMounted, ref, watch, watchEffect } from 'vue'
+import {
+  inject,
+  onUnmounted,
+  onMounted,
+  ref,
+  watch,
+  watchEffect,
+  computed,
+} from 'vue';
 
-import logo from '../assets/logo.png'
-import text_logo from '../assets/text_logo.png'
-import pkg from '../../package.json'
+import logo from '../assets/logo.png';
+import text_logo from '../assets/text_logo.png';
+import pkg from '../../package.json';
+import { VITE_API } from '../env';
 
-const game = inject('game')
-const state = inject('state')
-const loading = inject('loading')
-const ws_status = inject('ws_status')
-const name = ref('')
+const game = inject('game');
+const state = inject('state');
+const loading = inject('loading');
+const ws_status = inject('ws_status');
+const auth_user = inject('auth_user');
+const name = ref('');
+const play_button_disabled = ref(false);
 
-const menu_type = ref(ws_status.value === 'OPEN' ? 'CHARACTERS' : 'PLAY')
+const name_error = ref('');
 
-function play_as_guest() {
-  game.value.events.emit('CONNECT_TO_SERVER')
-  loading.value = true
+const is_logged = computed(() => !!auth_user?.uuid);
+
+const menu_type = ref(ws_status.value === 'OPEN' ? 'CHARACTERS' : 'PLAY');
+
+const open_app = () => {
+  window.location.href = 'https://app.aresrpg.world';
+};
+
+const open_discord = () => {
+  window.open('https://discord.gg/aresrpg', '_blank');
+};
+
+const open_twitter = () => {
+  window.open('https://twitter.com/aresrpg', '_blank');
+};
+
+function play() {
+  play_button_disabled.value = true;
+  game.value.events.emit('CONNECT_TO_SERVER');
+  loading.value++;
+
+  // prevent spam
+  setTimeout(() => {
+    play_button_disabled.value = false;
+  }, 4000);
 }
 
 function show_characters_menu() {
-  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 1.2, 4])
-  menu_type.value = 'CHARACTERS'
+  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 1.2, 4]);
+  menu_type.value = 'CHARACTERS';
 }
 
 function show_characters_creation() {
-  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 1.6, 4])
-  menu_type.value = 'CREATE_CHARACTER'
+  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 1.6, 4]);
+  menu_type.value = 'CREATE_CHARACTER';
 }
 
 function on_character_list({ characters }) {
-  loading.value = false
-  if (!characters.length) show_characters_creation()
-  else show_characters_menu()
+  loading.value--;
+  name.value = '';
+  if (!characters.length) show_characters_creation();
+  else show_characters_menu();
 }
 
-function on_connection_success() {
-  game.value.send_packet('packet/listCharacters', {})
+const name_too_short = computed(() => name.value.trim().length < 3);
+const name_too_long = computed(() => name.value.trim().length > 20);
+const name_invalid = computed(
+  () => !name.value.trim().match(/^[a-zA-Z0-9-_]+$/),
+);
+
+const Errors = {
+  0: 'CREATE_CHARACTER_NAME_TAKEN',
+};
+
+function on_server_error({ code }) {
+  switch (Errors[code]) {
+    case 'CREATE_CHARACTER_NAME_TAKEN':
+      name_error.value = 'This name is already taken';
+      break;
+    default:
+      break;
+  }
 }
+
+watch(name, value => {
+  if (value.length > 2 && name_too_long.value)
+    name_error.value = 'Name is too long';
+  else if (value.length > 2 && name_invalid.value)
+    name_error.value = 'Name is invalid';
+  else if (value) name_error.value = '';
+});
 
 function create_character() {
-  if (!name.value) {
-    alert('Please enter a name')
-    return
-  }
-
-  game.value.send_packet('packet/createCharacter', { name: name.value })
+  game.value.send_packet('packet/createCharacter', { name: name.value });
 }
 
 function select_character({ id }) {
-  game.value.dispatch('action/load_game_state', 'GAME')
-  game.value.send_packet('packet/selectCharacter', { id })
+  game.value.dispatch('action/select_character', id);
+  game.value.send_packet('packet/selectCharacter', { id });
 }
 
 onMounted(() => {
-  game.value.events.once('packet/connectionSuccess', on_connection_success)
-  game.value.events.on('packet/listCharactersResponse', on_character_list)
-})
+  game.value.events.on('packet/listCharactersResponse', on_character_list);
+  game.value.events.on('packet/error', on_server_error);
+});
 
 onUnmounted(() => {
-  game.value.events.off('packet/connectionSuccess', on_connection_success)
-  game.value.events.off('packet/listCharactersResponse', on_character_list)
-})
+  game.value.events.off('packet/listCharactersResponse', on_character_list);
+  game.value.events.off('packet/error', on_server_error);
+});
 </script>
 
 <style lang="stylus" scoped>
-
+a
+  text-decoration none
+  &:hover
+    color #ddd
 .menu
   nav
     position absolute
@@ -178,10 +240,6 @@ onUnmounted(() => {
       >*
         color white
         font-size 2.5em
-
-
-
-
   .menu_create_character
     position absolute
     width 80%
@@ -190,30 +248,35 @@ onUnmounted(() => {
     left 50%
     transform translate(-50%, -50%)
     backdrop-filter blur(50px)
-    opacity .9
     display grid
+    background rgba(#212121, .5)
+    border-radius 12px
+    overflow hidden
     place-items center center
     grid "slider slider slider" 4fr "desc perso spells" 4fr "back name play" 1fr / 1fr 1fr 1fr
     >*
-      border 2px solid #ddd
       color #eeeeee
     .slider
       grid-area slider
       place-self stretch
       margin 1em
+      background grey
     .desc
       grid-area desc
       place-self stretch
       margin 1em 3em
+      background grey
     .perso
       grid-area perso
       place-self stretch
       margin 1em
+      background grey
     .spells
       grid-area spells
       place-self stretch
       margin 1em 3em
-    input.name
+      background grey
+    .name
       grid-area name
       height 50px
       width 100%
@@ -225,10 +288,8 @@ onUnmounted(() => {
       text-align center
     .back
       grid-area back
-      border none
     .play
       grid-area play
-      border none
 
   .menu_play
     position absolute
@@ -239,6 +300,29 @@ onUnmounted(() => {
     flex-flow column nowrap
     justify-content center
     align-items center
+    .btns
+      width 300px
+      user-select none
+      >div
+        margin-bottom .5em
+      .sub
+        display flex
+        flex-flow row nowrap
+        justify-content space-between
+        >div
+          width 100%
+      .discord
+        margin-right .5em
+        background rgba(#7289DA, .8)
+        &:hover
+          background #5b6eae
+      .twitter
+        background rgba(#1DA1F2, .8)
+        &:hover
+          background #1b7bb9
+    .play
+      margin-bottom 1em
+      width 200px
     img.logo
       margin-bottom 2em
       width 600px

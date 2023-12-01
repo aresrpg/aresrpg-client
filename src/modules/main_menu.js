@@ -35,7 +35,7 @@ export default function () {
   let camera_moving = false
   const camera_target_position = new Vector3()
   let lerp_factor = 0
-  let mixer = null
+  let entity = null
 
   return {
     name: 'main_menu',
@@ -46,12 +46,15 @@ export default function () {
 
       sound.play()
 
-      const entity = Pool.guard.get()
-      const {
-        animations: { IDLE, mixer: animation_mixer },
-      } = entity
+      const audio_interval = setInterval(() => {
+        sound.context.resume()
+        if (sound.context.state === 'running') {
+          console.log('clearing interval')
+          clearInterval(audio_interval)
+        }
+      }, 500)
 
-      mixer = animation_mixer
+      entity = Pool.guard.get()
 
       const spot = new SpotLight(0xffffff, 1, 0, Math.PI / 2, 1, 2)
 
@@ -95,8 +98,6 @@ export default function () {
       // @ts-ignore
       entity.three_body.collider.visible = false
 
-      IDLE.play()
-
       events.on('MOVE_MENU_CAMERA', ([x, y, z]) => {
         camera_target_position.set(x, y, z)
         camera_moving = true
@@ -112,6 +113,8 @@ export default function () {
 
         dispose(grass)
 
+        clearInterval(audio_interval)
+
         entity.remove()
         scene.remove(grass)
         scene.remove(light)
@@ -121,7 +124,7 @@ export default function () {
     },
     tick(state, { camera }, delta) {
       grass.update(delta)
-      mixer?.update(delta)
+      entity.animate('IDLE', delta)
 
       if (camera_moving) {
         lerp_factor += delta * 0.1 // Adjust the 0.5 value to control the speed

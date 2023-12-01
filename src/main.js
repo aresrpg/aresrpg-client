@@ -1,30 +1,33 @@
 import { createApp, provide } from 'vue'
 import { registerSW } from 'virtual:pwa-register'
-import Toast, { useToast } from 'vue-toastification'
-import 'vue-toastification/dist/index.css'
 import { BufferGeometry, Mesh } from 'three'
-import { library } from '@fortawesome/fontawesome-svg-core'
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
-import { faPlus } from '@fortawesome/free-solid-svg-icons'
+import Vuesax from 'vuesax-alpha'
+import 'vuesax-alpha/dist/index.css'
+import 'vuesax-alpha/theme-chalk/dark/css-vars.css'
+import { inject } from '@vercel/analytics'
 
 // @ts-ignore
 import app from './app.vue'
+import toast from './toast'
+
+inject()
 
 const vue_app = createApp(app)
-const toast = useToast()
 
-library.add(faPlus)
-
-vue_app.component('fa', FontAwesomeIcon).use(Toast).mount('#app')
+vue_app
+  .use(Vuesax, {
+    colors: {
+      primary: '#F1C40F',
+      success: '#2ECC71',
+      danger: '#E74C3C',
+      warning: '#E67E22',
+      dark: '#2C3E50',
+    },
+  })
+  .mount('#app')
 
 const updateSW = registerSW({
   onOfflineReady() {
-    toast('ready to work offline!')
+    toast.info('AresRPG was cached for faster loading.', 'Service Worker')
   },
 })
-
-vue_app.config.compilerOptions.isCustomElement = tag => {
-  if (tag.startsWith('el-')) return true
-  if (tag.startsWith('upload-')) return true
-  return false
-}
