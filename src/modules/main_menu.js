@@ -48,10 +48,7 @@ export default function () {
 
       const audio_interval = setInterval(() => {
         sound.context.resume()
-        if (sound.context.state === 'running') {
-          console.log('clearing interval')
-          clearInterval(audio_interval)
-        }
+        if (sound.context.state === 'running') clearInterval(audio_interval)
       }, 500)
 
       entity = Pool.guard.get()
