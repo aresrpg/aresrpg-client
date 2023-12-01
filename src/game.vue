@@ -63,7 +63,7 @@ const game = ref(
               disconnect_reason = event.reason;
               if (event.reason === 'EARLY_ACCESS_KEY_REQUIRED')
                 toast.error(
-                  'You need an early access key to access AresRPG',
+                  'You need an early access key to play on AresRPG',
                   'Oh no!',
                   `<i class='bx bx-key'/>`,
                 );
