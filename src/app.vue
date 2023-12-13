@@ -41,12 +41,15 @@ let loading_instance = null;
 watchEffect(() => {
   if (loading.value < 0) loading.value = 0;
   if (loading.value === 1) {
+    loading_instance?.close();
     loading_instance = VsLoadingFn({
       type: 'square',
       color: '#F1C40F',
       background: '#212121',
     });
-  } else if (!loading.value) loading_instance?.close();
+  } else if (!loading.value) {
+    loading_instance?.close();
+  }
 });
 
 function request(query, variables = {}) {

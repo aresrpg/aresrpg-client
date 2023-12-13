@@ -12,16 +12,27 @@ import {
   SRGBColorSpace,
   VSMShadowMap,
   DefaultLoadingManager,
+  ACESFilmicToneMapping,
+  FogExp2,
+  Vector2,
+  Vector4,
+  Quaternion,
+  Matrix4,
+  Spherical,
+  Box3,
+  Sphere,
+  Raycaster,
 } from 'three'
 import merge from 'fast-merge-async-iterators'
 import { aiter } from 'iterator-helper'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { World } from '@dimforge/rapier3d'
+import CameraControls from 'camera-controls'
 
 import { combine } from './utils/iterator.js'
 import ui_fps from './modules/ui_fps.js'
 import game_camera from './modules/game_camera.js'
-import game_lights from './modules/game_lights.js'
+import game_render from './modules/game_render.js'
 import window_resize from './modules/window_resize.js'
 import player_inputs from './modules/player_inputs.js'
 import player_movement from './modules/player_movement.js'
@@ -35,8 +46,9 @@ import game_sky from './modules/game_sky.js'
 import game_connect from './modules/game_connect.js'
 import player_characters from './modules/player_characters.js'
 import game_world from './modules/game_world.js'
-import initialize_chunks from './chunks.js'
 import create_pools from './pool.js'
+import world_editor from './modules/world_editor.js'
+import game_nature from './modules/game_nature.js'
 
 export const GRAVITY = 9.81
 export const PLAYER_ID = 'player'
@@ -73,7 +85,7 @@ LOADING_MANAGER.onLoad = () => {
 
 export const INITIAL_STATE = {
   /** @type {Type.GameState} */
-  game_state: 'MENU',
+  game_state: 'EDITOR',
   settings: {
     target_fps: 60,
     game_speed: 1,
@@ -94,6 +106,9 @@ export const INITIAL_STATE = {
     show_entities_volume: false,
     show_entities_collider: false,
     volume_depth: 10,
+
+    outline_angle: 30,
+    outline_weight: 5,
     // if true, each frame will try to keep up to date each settings above
     // this can be useful when debugging but is ressource intensive
     debug_mode: DEBUG_MODE,
@@ -121,6 +136,20 @@ export const INITIAL_STATE = {
   ],
 }
 
+CameraControls.install({
+  THREE: {
+    Vector2,
+    Vector3,
+    Vector4,
+    Quaternion,
+    Matrix4,
+    Spherical,
+    Box3,
+    Sphere,
+    Raycaster,
+  },
+})
+
 const PERMANENT_MODULES = [
   // might need to stay first
   game_cache,
@@ -132,11 +161,14 @@ const PERMANENT_MODULES = [
   game_sky,
   game_connect,
   player_characters,
+  game_render,
+  game_nature,
 ]
 
 const GAME_MODULES = {
+  EDITOR: [world_editor],
   MENU: [main_menu],
-  GAME: [ui_settings, game_lights, player_movement, game_camera, game_world],
+  GAME: [ui_settings, player_movement, game_camera, game_world],
 }
 
 function last_event_value(emitter, event, default_value = null) {
@@ -150,10 +182,9 @@ function last_event_value(emitter, event, default_value = null) {
 async function create_context({ send_packet, connect_ws }) {
   const scene = new Scene()
   const world = new World(new Vector3(0, -GRAVITY, 0))
-  // scene.background = new Color('#E0E0E0')
-  scene.fog = new Fog(0x263238 / 2, 20, 70)
+  scene.background = new Color('#E0E0E0')
+  scene.fog = new FogExp2(0xecf0f1, 0.001)
 
-  const chunks = await initialize_chunks(world)
   const renderer = new WebGLRenderer()
 
   const Pool = await create_pools({ scene, world })
@@ -164,6 +195,7 @@ async function create_context({ send_packet, connect_ws }) {
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = VSMShadowMap
   renderer.outputColorSpace = SRGBColorSpace
+  renderer.toneMapping = ACESFilmicToneMapping
 
   const composer = new EffectComposer(renderer)
   composer.setSize(window.innerWidth, window.innerHeight)
@@ -172,10 +204,10 @@ async function create_context({ send_packet, connect_ws }) {
     60, // Field of view
     window.innerWidth / window.innerHeight, // Aspect ratio
     0.1, // Near clipping plane
-    100, // Far clipping plane
+    2000, // Far clipping plane
   )
 
-  camera.far = 100
+  camera.far = 2000
 
   /** @type {Type.Events} */
   // @ts-ignore
@@ -188,6 +220,7 @@ async function create_context({ send_packet, connect_ws }) {
     actions,
     Pool,
     composer,
+    camera_controls: new CameraControls(camera, renderer.domElement),
     /** @type {import("aresrpg-protocol/src/types").create_client['send']} */
     send_packet,
     /** @type {() => Promise<void>} */
@@ -204,7 +237,6 @@ async function create_context({ send_packet, connect_ws }) {
     renderer,
     camera,
     world,
-    chunks,
     /** @type {AbortSignal} */
     signal: new AbortController().signal,
   }

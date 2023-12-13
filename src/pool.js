@@ -19,7 +19,11 @@ import step3 from './assets/step3.ogg'
 import step4 from './assets/step4.ogg'
 import step5 from './assets/step5.ogg'
 import step6 from './assets/step6.ogg'
-import { load_fbx_animation, load_fbx_model } from './utils/load_model'
+import {
+  MODEL_SCALE,
+  load_fbx_animation,
+  load_fbx_model,
+} from './utils/load_model.js'
 import guard_fbx from './models/guard.fbx?url'
 import guard_idle_fbx from './animations/guard_idle.fbx?url'
 import guard_run_fbx from './animations/guard_run.fbx?url'
@@ -68,7 +72,7 @@ const Models = {
   },
 }
 
-function get_model_size(model, scale = 0.01) {
+function get_model_size(model, scale = MODEL_SCALE) {
   const bbox = new Box3().setFromObject(model)
   const size = bbox.getSize(new Vector3())
 

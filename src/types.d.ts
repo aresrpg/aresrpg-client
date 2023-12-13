@@ -20,7 +20,7 @@ declare namespace Type {
   type Module = import('./game').Module
   type State = import('./game').State
   type Packets = import('aresrpg-protocol/src/types').Packets
-  type GameState = 'MENU' | 'GAME'
+  type GameState = 'MENU' | 'GAME' | 'EDITOR'
 
   type Entity = {
     id: string
@@ -63,6 +63,10 @@ declare namespace Type {
       STATE_UPDATED: State // the game state has been updated
       MOVE_MENU_CAMERA: [number, number, number] // move the camera of the menu screen
       CONNECT_TO_SERVER: void // request ws connection to the server
+      CHANGE_CHUNK: {
+        last_chunk: { x: number; y: number }
+        current_chunk: { x: number; y: number }
+      } // change the current chunk
     } & Packets
   >
 

@@ -1,10 +1,26 @@
-import { Audio, AudioListener, AudioLoader, Quaternion, Vector3 } from 'three'
+import {
+  Audio,
+  AudioListener,
+  AudioLoader,
+  MeshBasicMaterial,
+  Quaternion,
+  Vector3,
+} from 'three'
+import workerpool from 'workerpool'
+import { to_chunk_position, is_neighbor_chunk } from 'aresrpg-protocol'
 
 import pandala from '../assets/pandala.wav'
 import { PLAYER_ID } from '../game.js'
 import { compute_animation_state } from '../utils/animation.js'
+import log from '../utils/logger.js'
+import request_chunk_load from '../utils/chunks'
+import dispose from '../utils/dispose'
 
 const make_chunk_key = (x, z) => `${x}:${z}`
+const from_chunk_key = key => {
+  const [x, z] = key.split(':')
+  return { x: +x, z: +z }
+}
 
 const listener = new AudioListener()
 const sound = new Audio(listener)
@@ -21,9 +37,7 @@ sound.setVolume(0.5)
 /** @type {Type.Module} */
 export default function () {
   /** @type {Map<string, import("three").Mesh>} chunk position to chunk */
-  const loaded_chunks_colliders = new Map()
-  const loaded_chunks_models = new Map()
-  /** @type {Map<string, Type.Entity>}  id to entity */
+  const loaded_chunks = new Map()
   const entities = new Map()
   return {
     name: 'game_world',
@@ -35,6 +49,8 @@ export default function () {
           show_terrain,
           show_entities_collider,
           show_entities,
+          outline_angle,
+          outline_weight,
           debug_mode,
         },
       },
@@ -92,14 +108,11 @@ export default function () {
 
       if (!debug_mode) return
 
-      loaded_chunks_colliders.forEach(chunk_collider => {
-        if (chunk_collider.visible !== show_terrain_collider)
-          chunk_collider.visible = show_terrain_collider
-      })
+      loaded_chunks.forEach(({ terrain, collider }) => {
+        if (collider.visible !== show_terrain_collider)
+          collider.visible = show_terrain_collider
 
-      loaded_chunks_models.forEach(chunk_model => {
-        if (chunk_model.visible !== show_terrain)
-          chunk_model.visible = show_terrain
+        if (terrain.visible !== show_terrain) terrain.visible = show_terrain
       })
 
       entities.forEach(({ three_body }) => {
@@ -134,7 +147,17 @@ export default function () {
       }
       return state
     },
-    observe({ events, signal, scene, dispatch, chunks, Pool, send_packet }) {
+    observe({
+      events,
+      signal,
+      scene,
+      dispatch,
+      Pool,
+      send_packet,
+      get_state,
+      world,
+      camera_controls,
+    }) {
       events.once('STATE_UPDATED', () => {
         sound.play()
         const player = Pool.guard.get({ add_rigid_body: true })
@@ -175,42 +198,95 @@ export default function () {
         if (entity) entity.target_position = new Vector3(x, y, z)
       })
 
-      events.on('packet/chunkLoad', ({ position: { x, z } }) => {
+      events.on('CHANGE_CHUNK', ({ last_chunk, current_chunk }) => {
+        loaded_chunks.forEach((chunk, key) => {
+          const is_neighbor = is_neighbor_chunk(
+            current_chunk,
+            from_chunk_key(key),
+          )
+          const collider_index = camera_controls.colliderMeshes.indexOf(
+            chunk.collider,
+          )
+          if (is_neighbor && collider_index === -1) {
+            chunk.enable_collisions(true)
+            camera_controls.colliderMeshes.push(chunk.collider)
+          } else if (!is_neighbor && collider_index !== -1) {
+            chunk.enable_collisions(false)
+            camera_controls.colliderMeshes.splice(collider_index, 1)
+          }
+        })
+      })
+
+      events.on('packet/chunkUnload', ({ position: { x, z } }) => {
         const key = make_chunk_key(x, z)
-        const { collider, terrain, enable_collisions } = chunks[key]
+        const chunk = loaded_chunks.get(key)
+        if (chunk) {
+          chunk.enable_collisions(false)
 
-        scene.add(collider)
-        scene.add(terrain)
-        enable_collisions(true)
+          scene.remove(chunk.collider)
+          scene.remove(chunk.terrain)
 
-        loaded_chunks_colliders.set(key, collider)
-        loaded_chunks_models.set(key, terrain)
+          // dispose(chunk.collider)
+          // dispose(chunk.terrain)
 
-        signal.addEventListener(
-          'abort',
-          () => {
-            scene.remove(collider)
-            scene.remove(terrain)
+          loaded_chunks.delete(key)
+        }
+      })
 
-            sound.stop()
+      events.on('packet/chunkLoad', async ({ position: { x, z } }) => {
+        try {
+          const key = make_chunk_key(x, z)
 
-            enable_collisions(false)
+          const { terrain, enable_collisions, collider } =
+            await request_chunk_load({
+              chunk_x: x,
+              chunk_z: z,
+              world,
+            })
 
-            loaded_chunks_colliders.delete(key)
-            loaded_chunks_models.delete(key)
-          },
-          { once: true },
-        )
+          const state = get_state()
+
+          scene.add(collider)
+          scene.add(terrain)
+
+          const player_chunk = to_chunk_position(state.player.position())
+
+          if (is_neighbor_chunk(player_chunk, { x, z })) {
+            enable_collisions(true)
+            camera_controls.colliderMeshes.push(collider)
+          }
+
+          loaded_chunks.set(key, { terrain, enable_collisions, collider })
+
+          signal.addEventListener(
+            'abort',
+            () => {
+              scene.remove(collider)
+              scene.remove(terrain)
+
+              enable_collisions(false)
+
+              loaded_chunks.delete(key)
+            },
+            { once: true },
+          )
+        } catch (error) {
+          console.error(error)
+        }
+      })
+
+      signal.addEventListener('abort', () => {
+        sound.stop()
       })
 
       events.on('packet/entityAction', ({ id, action }) => {
         const entity = entities.get(id)
         if (entity) {
           switch (action) {
-            case 0: // jump
+            case 'JUMP':
               entity.is_jumping = 0.5
               break
-            case 1: // dance
+            case 'DANCE':
               entity.is_dancing = true
               break
             default:

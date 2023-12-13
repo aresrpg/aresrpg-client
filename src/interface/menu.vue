@@ -111,12 +111,8 @@ const name_invalid = computed(
   () => !name.value.trim().match(/^[a-zA-Z0-9-_]+$/),
 );
 
-const Errors = {
-  0: 'CREATE_CHARACTER_NAME_TAKEN',
-};
-
 function on_server_error({ code }) {
-  switch (Errors[code]) {
+  switch (code) {
     case 'CREATE_CHARACTER_NAME_TAKEN':
       name_error.value = 'This name is already taken';
       break;
@@ -203,7 +199,7 @@ a
         position absolute
         width 100%
         height 100%
-        background url('https://www.pockettactics.com/wp-content/sites/pockettactics/2023/08/waven-early-access.jpg') center / cover
+        background url('src/assets/iop_bg.png') center / cover
         filter grayscale(50%)
         z-index -1
       .grad
