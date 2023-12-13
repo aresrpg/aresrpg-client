@@ -1,6 +1,5 @@
 export default {
   DEFAULT: {
-    seed: 'aresrpg_default',
     scale: 424,
     height: 70,
     octaves: 4,

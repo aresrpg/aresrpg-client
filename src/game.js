@@ -22,6 +22,7 @@ import {
   Box3,
   Sphere,
   Raycaster,
+  OrthographicCamera,
 } from 'three'
 import merge from 'fast-merge-async-iterators'
 import { aiter } from 'iterator-helper'
@@ -47,8 +48,8 @@ import game_connect from './modules/game_connect.js'
 import player_characters from './modules/player_characters.js'
 import game_world from './modules/game_world.js'
 import create_pools from './pool.js'
-import world_editor from './modules/world_editor.js'
 import game_nature from './modules/game_nature.js'
+import Biomes from './world_gen/biomes.js'
 
 export const GRAVITY = 9.81
 export const PLAYER_ID = 'player'
@@ -85,12 +86,12 @@ LOADING_MANAGER.onLoad = () => {
 
 export const INITIAL_STATE = {
   /** @type {Type.GameState} */
-  game_state: 'EDITOR',
+  game_state: 'MENU',
   settings: {
-    target_fps: 60,
+    target_fps: 120,
     game_speed: 1,
     mouse_sensitivity: 0.005,
-    show_fps: false,
+    show_fps: true,
     keymap: new Map([
       ['KeyW', 'forward'],
       ['KeyS', 'backward'],
@@ -102,13 +103,13 @@ export const INITIAL_STATE = {
     show_terrain: true,
     show_entities: true,
     show_terrain_collider: false,
-    show_terrain_volume: false,
-    show_entities_volume: false,
     show_entities_collider: false,
-    volume_depth: 10,
 
-    outline_angle: 30,
-    outline_weight: 5,
+    view_distance: 3,
+    show_chunk_border: false,
+
+    free_camera: false,
+
     // if true, each frame will try to keep up to date each settings above
     // this can be useful when debugging but is ressource intensive
     debug_mode: DEBUG_MODE,
@@ -121,6 +122,11 @@ export const INITIAL_STATE = {
     right: false,
     jump: false,
     dance: false,
+  },
+
+  world: {
+    seed: 'aresrpg',
+    biome: { ...Biomes.DEFAULT },
   },
 
   /** @type {Type.Entity} */
@@ -166,7 +172,6 @@ const PERMANENT_MODULES = [
 ]
 
 const GAME_MODULES = {
-  EDITOR: [world_editor],
   MENU: [main_menu],
   GAME: [ui_settings, player_movement, game_camera, game_world],
 }
@@ -183,7 +188,7 @@ async function create_context({ send_packet, connect_ws }) {
   const scene = new Scene()
   const world = new World(new Vector3(0, -GRAVITY, 0))
   scene.background = new Color('#E0E0E0')
-  scene.fog = new FogExp2(0xecf0f1, 0.001)
+  scene.fog = new Fog('#E0E0E0', 0, 600)
 
   const renderer = new WebGLRenderer()
 
@@ -206,6 +211,8 @@ async function create_context({ send_packet, connect_ws }) {
     0.1, // Near clipping plane
     2000, // Far clipping plane
   )
+
+  const orthographic_camera = new OrthographicCamera()
 
   camera.far = 2000
 
@@ -235,6 +242,7 @@ async function create_context({ send_packet, connect_ws }) {
     get_state,
     scene,
     renderer,
+    orthographic_camera,
     camera,
     world,
     /** @type {AbortSignal} */

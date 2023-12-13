@@ -67,6 +67,38 @@ export default function () {
               show_entities: payload,
             },
           }
+        case 'action/view_distance':
+          return {
+            ...state,
+            settings: {
+              ...state.settings,
+              view_distance: Math.max(2, Math.min(20, payload)),
+            },
+          }
+        case 'action/biome_settings':
+          return {
+            ...state,
+            world: {
+              ...state.world,
+              biome: payload,
+            },
+          }
+        case 'action/show_chunk_border':
+          return {
+            ...state,
+            settings: {
+              ...state.settings,
+              show_chunk_border: payload,
+            },
+          }
+        case 'action/free_camera':
+          return {
+            ...state,
+            settings: {
+              ...state.settings,
+              free_camera: payload,
+            },
+          }
       }
 
       return state

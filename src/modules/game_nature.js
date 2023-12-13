@@ -29,7 +29,7 @@ const Colors = {
   night: new Color(0x0000ff),
 }
 
-const DAY_DURATION = 600000 // 10 minutes in milliseconds
+export const DAY_DURATION = 600000 // 10 minutes in milliseconds
 const CAMERA_SHADOW_FAR = 500
 const CAMERA_SHADOW_NEAR = 0.1
 const CAMERA_SHADOW_SIZE = 300
@@ -55,7 +55,7 @@ export default function () {
     tick() {
       if (water) water.material.uniforms.time.value += 1.0 / 60.0
     },
-    observe({ scene, renderer, signal, camera, get_state }) {
+    observe({ scene, renderer, signal, camera, get_state, events }) {
       // lights
       const ambiant_light = new AmbientLight(0xffffff, 0.5)
 
@@ -109,7 +109,7 @@ export default function () {
       scene.add(mooncamera_helper)
 
       // water
-      water.position.y = 15
+      water.position.y = 15.5
       water.rotation.x = -Math.PI / 2
 
       scene.add(water)
@@ -137,6 +137,10 @@ export default function () {
       let sky_azimuth = 0
       let day_time = DAY_DURATION * 0.7 // Track the time of day as a value between 0 and DAY_DURATION
       const day_time_step = 100 // How much to increment day_time each frame
+
+      events.on('SET_TIME', time => {
+        day_time = time
+      })
 
       aiter(abortable(setInterval(day_time_step, null, { signal }))).forEach(
         () => {

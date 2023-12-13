@@ -16,8 +16,7 @@ import {
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
 import { aiter } from 'iterator-helper'
 
-import { abortable, combine, named_on } from '../utils/iterator.js'
-import { PLAYER_ID } from '../game'
+import { abortable } from '../utils/iterator.js'
 
 const CAMERA_MAX_POLAR_ANGLE = Math.PI * 0.5 * 0.7 //  70% of the half PI
 const CAMERA_MIN_ZOOM = 4
@@ -30,17 +29,31 @@ export default function () {
 
   return {
     name: 'game_camera',
-    tick({ player }, { camera, camera_controls }, delta) {
+    tick(
+      { player, settings: { free_camera } },
+      { camera, camera_controls },
+      delta,
+    ) {
       if (!player) return
 
-      const { height } = player
-      const position = player.position()
+      if (!free_camera) {
+        const position = player.position()
 
-      camera_controls.moveTo(position.x, position.y, position.z)
-      camera_controls.setTarget(position.x, position.y, position.z)
+        camera_controls.moveTo(position.x, position.y, position.z)
+        camera_controls.setTarget(position.x, position.y, position.z)
+      }
+
       camera_controls.update(delta)
     },
-    observe({ camera, camera_controls, get_state, renderer, signal, scene }) {
+    observe({
+      events,
+      camera,
+      camera_controls,
+      get_state,
+      renderer,
+      signal,
+      scene,
+    }) {
       function set_camera_padding(top, right, bottom, left) {
         const full_width = window.innerWidth - left + right
         const full_height = window.innerHeight - top + bottom
@@ -79,6 +92,31 @@ export default function () {
       renderer.domElement.addEventListener('mousedown', on_mouse_down, {
         signal,
       })
+
+      aiter(abortable(on(events, 'STATE_UPDATED', { signal }))).reduce(
+        (last_free_camera, { settings: { free_camera } }) => {
+          if (last_free_camera !== free_camera) {
+            if (free_camera) {
+              camera_controls.colliderMeshes = []
+              camera_controls.maxDistance = 1000
+              camera_controls.minDistance = 0
+              renderer.domElement.removeEventListener(
+                'mousedown',
+                on_mouse_down,
+              )
+              set_camera_padding(0, 0, 0, 0)
+            } else {
+              camera_controls.maxDistance = CAMERA_MAX_ZOOM
+              camera_controls.minDistance = CAMERA_MIN_ZOOM
+              renderer.domElement.addEventListener('mousedown', on_mouse_down, {
+                signal,
+              })
+              set_camera_padding(200, 0, 0, 0)
+            }
+          }
+          return free_camera
+        },
+      )
 
       window.addEventListener(
         'mouseup',

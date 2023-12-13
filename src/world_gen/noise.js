@@ -1,16 +1,9 @@
 import { createNoise2D } from 'simplex-noise'
 import alea from 'alea'
 
-export function create_fractionnal_brownian(biome) {
-  const {
-    seed,
-    scale,
-    height,
-    octaves,
-    persistence,
-    lacunarity,
-    exponentiation,
-  } = biome
+export function create_fractionnal_brownian(biome, seed) {
+  const { scale, height, octaves, persistence, lacunarity, exponentiation } =
+    biome
 
   const memoized = new Map()
   const noise_pass_1 = createNoise2D(alea(`${seed}_1`))

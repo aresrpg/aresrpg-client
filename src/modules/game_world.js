@@ -1,3 +1,5 @@
+import { on } from 'events'
+
 import {
   Audio,
   AudioListener,
@@ -7,16 +9,17 @@ import {
   Vector3,
 } from 'three'
 import workerpool from 'workerpool'
-import { to_chunk_position, is_neighbor_chunk } from 'aresrpg-protocol'
+import { to_chunk_position, spiral_array } from 'aresrpg-protocol/src/chunk.js'
+import { aiter } from 'iterator-helper'
 
 import pandala from '../assets/pandala.wav'
 import { PLAYER_ID } from '../game.js'
 import { compute_animation_state } from '../utils/animation.js'
 import log from '../utils/logger.js'
 import request_chunk_load from '../utils/chunks'
-import dispose from '../utils/dispose'
+import { abortable } from '../utils/iterator'
 
-const make_chunk_key = (x, z) => `${x}:${z}`
+const make_chunk_key = ({ x, z }) => `${x}:${z}`
 const from_chunk_key = key => {
   const [x, z] = key.split(':')
   return { x: +x, z: +z }
@@ -36,9 +39,11 @@ sound.setVolume(0.5)
 
 /** @type {Type.Module} */
 export default function () {
-  /** @type {Map<string, import("three").Mesh>} chunk position to chunk */
+  /** @typedef {{ terrain: import("three").Mesh, collider: import("three").Mesh, enable_collisions: (x: boolean) => void}} chunk */
+  /** @type {Map<string, chunk>} chunk position to chunk */
   const loaded_chunks = new Map()
   const entities = new Map()
+
   return {
     name: 'game_world',
     tick(
@@ -49,8 +54,7 @@ export default function () {
           show_terrain,
           show_entities_collider,
           show_entities,
-          outline_angle,
-          outline_weight,
+          show_chunk_border,
           debug_mode,
         },
       },
@@ -108,11 +112,13 @@ export default function () {
 
       if (!debug_mode) return
 
-      loaded_chunks.forEach(({ terrain, collider }) => {
+      loaded_chunks.forEach(({ terrain, collider, chunk_border }) => {
         if (collider.visible !== show_terrain_collider)
           collider.visible = show_terrain_collider
 
         if (terrain.visible !== show_terrain) terrain.visible = show_terrain
+        if (chunk_border.visible !== show_chunk_border)
+          chunk_border.visible = show_chunk_border
       })
 
       entities.forEach(({ three_body }) => {
@@ -145,6 +151,15 @@ export default function () {
           player: payload,
         }
       }
+      if (type === 'packet/worldSeed') {
+        return {
+          ...state,
+          world: {
+            ...state.world,
+            seed: payload.seed,
+          },
+        }
+      }
       return state
     },
     observe({
@@ -158,6 +173,20 @@ export default function () {
       world,
       camera_controls,
     }) {
+      function reset_chunks() {
+        loaded_chunks.forEach(
+          ({ terrain, enable_collisions, collider, dispose, chunk_border }) => {
+            scene.remove(terrain)
+            scene.remove(collider)
+            scene.remove(chunk_border)
+
+            dispose()
+            enable_collisions(false)
+          },
+        )
+        loaded_chunks.clear()
+      }
+
       events.once('STATE_UPDATED', () => {
         sound.play()
         const player = Pool.guard.get({ add_rigid_body: true })
@@ -198,85 +227,119 @@ export default function () {
         if (entity) entity.target_position = new Vector3(x, y, z)
       })
 
-      events.on('CHANGE_CHUNK', ({ last_chunk, current_chunk }) => {
-        loaded_chunks.forEach((chunk, key) => {
-          const is_neighbor = is_neighbor_chunk(
-            current_chunk,
-            from_chunk_key(key),
-          )
-          const collider_index = camera_controls.colliderMeshes.indexOf(
-            chunk.collider,
-          )
-          if (is_neighbor && collider_index === -1) {
-            chunk.enable_collisions(true)
-            camera_controls.colliderMeshes.push(chunk.collider)
-          } else if (!is_neighbor && collider_index !== -1) {
-            chunk.enable_collisions(false)
-            camera_controls.colliderMeshes.splice(collider_index, 1)
+      aiter(abortable(on(events, 'STATE_UPDATED', { signal }))).reduce(
+        (last_world, { world, player }) => {
+          if (last_world && last_world !== world) {
+            reset_chunks()
+
+            if (player) {
+              const chunk_position = to_chunk_position(player.position())
+              events.emit('CHANGE_CHUNK', chunk_position)
+            }
           }
-        })
-      })
+          return world
+        },
+      )
 
-      events.on('packet/chunkUnload', ({ position: { x, z } }) => {
-        const key = make_chunk_key(x, z)
-        const chunk = loaded_chunks.get(key)
-        if (chunk) {
-          chunk.enable_collisions(false)
+      aiter(abortable(on(events, 'CHANGE_CHUNK', { signal }))).forEach(
+        async current_chunk => {
+          try {
+            const {
+              settings,
+              world: { seed, biome },
+            } = get_state()
+            const chunks_with_collisions = spiral_array(current_chunk, 1).map(
+              make_chunk_key,
+            )
+            const new_chunks = spiral_array(
+              current_chunk,
+              settings.view_distance,
+            ).map(make_chunk_key)
 
-          scene.remove(chunk.collider)
-          scene.remove(chunk.terrain)
+            const chunks_to_load = new_chunks.filter(
+              key => !loaded_chunks.has(key),
+            )
 
-          // dispose(chunk.collider)
-          // dispose(chunk.terrain)
+            await Promise.all(
+              chunks_to_load.map(async key => {
+                const { x, z } = from_chunk_key(key)
+                const {
+                  terrain,
+                  enable_collisions,
+                  collider,
+                  dispose,
+                  chunk_border,
+                } = await request_chunk_load({
+                  chunk_x: x,
+                  chunk_z: z,
+                  world,
+                  biome,
+                  seed,
+                })
 
-          loaded_chunks.delete(key)
-        }
-      })
+                loaded_chunks.set(key, {
+                  terrain,
+                  enable_collisions,
+                  collider,
+                  dispose,
+                  chunk_border,
+                })
+              }),
+            )
 
-      events.on('packet/chunkLoad', async ({ position: { x, z } }) => {
-        try {
-          const key = make_chunk_key(x, z)
+            if (!settings.free_camera)
+              // Update camera_controls.colliderMeshes to match chunks_with_collisions
+              camera_controls.colliderMeshes = chunks_with_collisions.map(
+                key => loaded_chunks.get(key).collider,
+              )
 
-          const { terrain, enable_collisions, collider } =
-            await request_chunk_load({
-              chunk_x: x,
-              chunk_z: z,
-              world,
-            })
+            // Add new terrain and remove old terrain from the scene
+            loaded_chunks.forEach(
+              (
+                { terrain, collider, dispose, enable_collisions, chunk_border },
+                key,
+              ) => {
+                if (chunks_with_collisions.includes(key)) {
+                  enable_collisions(true)
+                  scene.add(collider)
+                } else {
+                  enable_collisions(false)
+                  scene.remove(collider)
+                }
 
-          const state = get_state()
+                if (new_chunks.includes(key)) {
+                  // Add terrain to the scene if not already present
+                  scene.add(terrain)
+                  scene.add(chunk_border)
+                } else {
+                  // Remove and dispose of terrain and collider if no longer needed
+                  scene.remove(terrain)
+                  scene.remove(chunk_border)
 
-          scene.add(collider)
-          scene.add(terrain)
+                  dispose()
 
-          const player_chunk = to_chunk_position(state.player.position())
-
-          if (is_neighbor_chunk(player_chunk, { x, z })) {
-            enable_collisions(true)
-            camera_controls.colliderMeshes.push(collider)
+                  loaded_chunks.delete(key)
+                }
+              },
+            )
+          } catch (error) {
+            console.error(error)
           }
-
-          loaded_chunks.set(key, { terrain, enable_collisions, collider })
-
-          signal.addEventListener(
-            'abort',
-            () => {
-              scene.remove(collider)
-              scene.remove(terrain)
-
-              enable_collisions(false)
-
-              loaded_chunks.delete(key)
-            },
-            { once: true },
-          )
-        } catch (error) {
-          console.error(error)
-        }
-      })
+        },
+      )
 
       signal.addEventListener('abort', () => {
         sound.stop()
+        loaded_chunks.forEach(({ terrain, collider, dispose }) => {
+          scene.remove(terrain)
+          scene.remove(collider)
+
+          dispose()
+
+          camera_controls.colliderMeshes = []
+        })
+
+        loaded_chunks.clear()
       })
 
       events.on('packet/entityAction', ({ id, action }) => {

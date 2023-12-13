@@ -1,7 +1,7 @@
 <template lang="pug">
 .aresrpg(v-if="webgl_available")
   Interface(v-if="STATE.game_state === 'GAME'")
-  Menu(v-else)
+  Menu(v-else-if="STATE.game_state === 'MENU'")
   .canvas(ref='renderer_container')
 .no_webgl(v-else) It seems WebGL is not available in your browser, please use a descent one 😀
 </template>
@@ -21,7 +21,6 @@ import {
 import WebGL from 'three/addons/capabilities/WebGL.js';
 import { useWebSocket } from '@vueuse/core';
 import { create_client } from 'aresrpg-protocol';
-import { Position } from 'aresrpg-protocol/generated/ares_pb';
 
 import logger from './utils/logger.js';
 import Interface from './interface/ui.vue';
