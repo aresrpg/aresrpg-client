@@ -1,18 +1,18 @@
 import { on } from 'events'
 
-import GUI from 'lil-gui'
+import { GUI } from 'dat.gui'
 import { aiter } from 'iterator-helper'
 
 import { INITIAL_STATE } from '../game'
 
 /** @type {Type.Module} */
 export default function () {
-  let gui = new GUI()
   const settings = { ...INITIAL_STATE.settings }
 
   return {
     name: 'ui_settings',
     observe({ events, dispatch, signal }) {
+      let gui = new GUI()
       signal.addEventListener('abort', () => {
         gui?.destroy()
         gui = new GUI()
@@ -44,15 +44,15 @@ export default function () {
         .name('Show Terrain')
         .onChange(handle_change('action/show_terrain'))
 
-      entity_folder
-        .add(settings, 'show_entities')
-        .name('Show Entities')
-        .onChange(handle_change('action/show_entities'))
-
       terrain_folder
         .add(settings, 'show_terrain_collider')
         .name('Terrain collider')
         .onChange(handle_change('action/show_terrain_collider'))
+
+      entity_folder
+        .add(settings, 'show_entities')
+        .name('Show Entities')
+        .onChange(handle_change('action/show_entities'))
 
       entity_folder
         .add(settings, 'show_entities_collider')

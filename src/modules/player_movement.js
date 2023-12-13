@@ -14,13 +14,14 @@ import {
 } from 'three'
 import { lerp } from 'three/src/math/MathUtils.js'
 import { get } from '@vueuse/core'
+import { to_chunk_position } from 'aresrpg-protocol'
 
 import { GRAVITY, PLAYER_ID } from '../game.js'
 import { abortable } from '../utils/iterator'
 import { compute_animation_state } from '../utils/animation.js'
 
-const SPEED = 5
-const JUMP_FORCE = 13
+const SPEED = 10
+const JUMP_FORCE = 23
 const CONTROLLER_OFFSET = 0.01
 const ASCENT_GRAVITY_FACTOR = 3
 const APEX_GRAVITY_FACTOR = 0.3
@@ -96,12 +97,15 @@ export default function ({ world }) {
   const controller = world.createCharacterController(CONTROLLER_OFFSET)
   const model_forward = new Vector3(0, 0, 1)
 
-  controller.enableAutostep(0.7, 0.3, false)
   // Don’t allow climbing slopes larger than 45 degrees.
   controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180)
   // Automatically slide down on slopes smaller than 30 degrees.
   controller.setMinSlopeSlideAngle((30 * Math.PI) / 180)
+
+  controller.enableAutostep(1.6, 0.3, false)
   controller.enableSnapToGround(0.7)
+  controller.setCharacterMass(100)
+  controller.setSlideEnabled(true)
 
   let jump_state = jump_states.NONE
   let jump_cooldown = 0
@@ -112,7 +116,7 @@ export default function ({ world }) {
 
   return {
     name: 'player_movements',
-    tick({ inputs, player }, { camera, send_packet }, delta) {
+    tick({ inputs, player }, { camera, send_packet, events }, delta) {
       if (!player) return
 
       const {
@@ -139,7 +143,7 @@ export default function ({ world }) {
       // TODO: tp to nether if falling to hell
       if (position.y <= -30) {
         velocity.setScalar(0)
-        player.move(new Vector3(0, 20, 0))
+        player.move(new Vector3(0, 100, 0))
         return
       }
 
@@ -246,6 +250,12 @@ export default function ({ world }) {
         player.move(new_position)
         player.animate(animation_name, delta)
       } else player.animate(inputs.dance ? 'DANCE' : 'IDLE', delta)
+
+      const last_chunk = to_chunk_position(position)
+      const current_chunk = to_chunk_position(new_position)
+
+      if (last_chunk.x !== current_chunk.x || last_chunk.z !== current_chunk.z)
+        events.emit('CHANGE_CHUNK', { last_chunk, current_chunk })
     },
     reduce(state, { type, payload }) {
       if (type === 'packet/playerPosition') {
@@ -273,8 +283,9 @@ export default function ({ world }) {
             last_position.x !== x ||
             last_position.y !== y ||
             last_position.z !== z
-          )
+          ) {
             send_packet('packet/playerPosition', { position })
+          }
 
           return position
         },

@@ -21,6 +21,7 @@
     "import/order": ["error", { "newlines-between": "always" }],
     "no-unused-vars": 0,// <script setup>
     "node/no-callback-literal": 0,
-    "no-dupe-class-members": 0
+    "no-dupe-class-members": 0,
+    "no-labels": 0
   }
 }
