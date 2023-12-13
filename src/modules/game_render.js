@@ -14,6 +14,11 @@ export default function () {
         window.innerHeight,
       )
 
+      // n8aopass.setDisplayMode('Split AO')
+      // n8aopass.configuration.aoSamples = 64
+      // n8aopass.configuration.denoiseSamples = 8
+      // n8aopass.configuration.denoiseRadius = 6
+
       composer.addPass(n8aopass)
       composer.addPass(smaapass)
 

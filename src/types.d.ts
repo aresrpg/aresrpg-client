@@ -48,14 +48,22 @@ declare namespace Type {
     'action/show_entities': boolean
     'action/show_terrain_collider': boolean
     'action/show_entities_collider': boolean
-    'action/show_terrain_volume': boolean
-    'action/show_entities_volume': boolean
-    'action/volume_depth': number
     'action/keydown': string
     'action/keyup': string
     'action/load_game_state': GameState
     'action/register_player': Entity
     'action/select_character': string
+    'action/view_distance': number
+    'action/biome_settings': {
+      scale: number
+      height: number
+      octaves: number
+      persistance: number
+      lacunarity: number
+      exponentiation: number
+    }
+    'action/show_chunk_border': boolean
+    'action/free_camera': boolean
   } & Packets
 
   type Events = import('aresrpg-protocol/src/types').TypedEmitter<
@@ -63,10 +71,8 @@ declare namespace Type {
       STATE_UPDATED: State // the game state has been updated
       MOVE_MENU_CAMERA: [number, number, number] // move the camera of the menu screen
       CONNECT_TO_SERVER: void // request ws connection to the server
-      CHANGE_CHUNK: {
-        last_chunk: { x: number; y: number }
-        current_chunk: { x: number; y: number }
-      } // change the current chunk
+      CHANGE_CHUNK: { x: number; z: number } // change the current chunk
+      SET_TIME: number // set the time of the day
     } & Packets
   >
 

@@ -20,7 +20,7 @@ export default defineConfig({
     vue(),
     nodePolyfills({
       // To add only specific polyfills, add them here. If no option is passed, adds all polyfills
-      include: ['stream', 'events', 'path', 'timers/promises'],
+      include: ['stream', 'events', 'path', 'timers/promises', 'util'],
       overrides: {
         events: 'events-polyfill',
       },

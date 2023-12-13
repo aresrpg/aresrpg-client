@@ -16,7 +16,7 @@ import { lerp } from 'three/src/math/MathUtils.js'
 import { get } from '@vueuse/core'
 import { to_chunk_position } from 'aresrpg-protocol'
 
-import { GRAVITY, PLAYER_ID } from '../game.js'
+import { GRAVITY } from '../game.js'
 import { abortable } from '../utils/iterator'
 import { compute_animation_state } from '../utils/animation.js'
 
@@ -104,7 +104,7 @@ export default function ({ world }) {
 
   controller.enableAutostep(1.6, 0.3, false)
   controller.enableSnapToGround(0.7)
-  controller.setCharacterMass(100)
+  // controller.setCharacterMass(100)
   controller.setSlideEnabled(true)
 
   let jump_state = jump_states.NONE
@@ -255,7 +255,7 @@ export default function ({ world }) {
       const current_chunk = to_chunk_position(new_position)
 
       if (last_chunk.x !== current_chunk.x || last_chunk.z !== current_chunk.z)
-        events.emit('CHANGE_CHUNK', { last_chunk, current_chunk })
+        events.emit('CHANGE_CHUNK', current_chunk)
     },
     reduce(state, { type, payload }) {
       if (type === 'packet/playerPosition') {

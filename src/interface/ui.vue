@@ -2,7 +2,8 @@
 .ui
   .top_left
     .zone Plaine des Caffres
-    .location {{position}}
+    .position {{ position }}
+    .chunk_position {{ chunk_position }}
     .version version {{ pkg.version }}
     .ws
       .title socket
@@ -22,8 +23,8 @@
 
 <script setup>
 import { onMounted, onUnmounted, inject, computed, ref } from 'vue';
+import { to_chunk_position } from 'aresrpg-protocol';
 
-import { PLAYER_ID } from '../game.js';
 import pkg from '../../package.json';
 
 const ws_status = inject('ws_status');
@@ -36,6 +37,12 @@ const position = computed(() => {
   const { position } = state.value.player;
   const { x, y, z } = position();
   return [Math.round(x), Math.round(y), Math.round(z)];
+});
+
+const chunk_position = computed(() => {
+  const [x, , z] = position.value;
+  const { x: cx, z: cz } = to_chunk_position({ x, z });
+  return [cx, cz];
 });
 
 function on_escape({ key }) {
@@ -74,7 +81,7 @@ onUnmounted(() => {
     .zone
       font-size 1.5em
       color #EEEEEE
-    .location
+    .position, .chunk_position
       font-size 1em
       color #EEEEEE
     .version
