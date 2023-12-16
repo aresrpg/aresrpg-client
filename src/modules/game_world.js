@@ -8,15 +8,21 @@ import {
   Quaternion,
   Vector3,
 } from 'three'
-import workerpool from 'workerpool'
-import { to_chunk_position, spiral_array } from 'aresrpg-protocol/src/chunk.js'
+import {
+  to_chunk_position,
+  spiral_array,
+  square_array,
+} from 'aresrpg-protocol/src/chunk.js'
 import { aiter } from 'iterator-helper'
 
 import pandala from '../assets/pandala.wav'
 import { PLAYER_ID } from '../game.js'
 import { compute_animation_state } from '../utils/animation.js'
 import log from '../utils/logger.js'
-import request_chunk_load from '../utils/chunks'
+import {
+  request_chunk_load,
+  request_low_detail_chunk_load,
+} from '../utils/chunks'
 import { abortable } from '../utils/iterator'
 
 const make_chunk_key = ({ x, z }) => `${x}:${z}`
@@ -42,6 +48,7 @@ export default function () {
   /** @typedef {{ terrain: import("three").Mesh, collider: import("three").Mesh, enable_collisions: (x: boolean) => void}} chunk */
   /** @type {Map<string, chunk>} chunk position to chunk */
   const loaded_chunks = new Map()
+  const low_detail_loaded_chunks = new Map()
   const entities = new Map()
 
   return {
@@ -185,6 +192,15 @@ export default function () {
           },
         )
         loaded_chunks.clear()
+
+        low_detail_loaded_chunks.forEach(({ terrain, dispose }) => {
+          scene.remove(terrain)
+          dispose()
+        })
+
+        low_detail_loaded_chunks.clear()
+
+        camera_controls.colliderMeshes = []
       }
 
       events.once('STATE_UPDATED', () => {
@@ -228,8 +244,15 @@ export default function () {
       })
 
       aiter(abortable(on(events, 'STATE_UPDATED', { signal }))).reduce(
-        (last_world, { world, player }) => {
-          if (last_world && last_world !== world) {
+        (
+          { last_world, last_view_distance, last_far_view_distance },
+          { world, player, settings: { view_distance, far_view_distance } },
+        ) => {
+          if (
+            last_world !== world ||
+            last_view_distance !== view_distance ||
+            last_far_view_distance !== far_view_distance
+          ) {
             reset_chunks()
 
             if (player) {
@@ -237,10 +260,15 @@ export default function () {
               events.emit('CHANGE_CHUNK', chunk_position)
             }
           }
-          return world
+          return {
+            last_world: world,
+            last_view_distance: view_distance,
+            last_far_view_distance: far_view_distance,
+          }
         },
       )
 
+      // handle voxels chunks
       aiter(abortable(on(events, 'CHANGE_CHUNK', { signal }))).forEach(
         async current_chunk => {
           try {
@@ -248,11 +276,12 @@ export default function () {
               settings,
               world: { seed, biome },
             } = get_state()
-            const chunks_with_collisions = spiral_array(current_chunk, 1).map(
+            const chunks_with_collisions = square_array(current_chunk, 1).map(
               make_chunk_key,
             )
             const new_chunks = spiral_array(
               current_chunk,
+              0,
               settings.view_distance,
             ).map(make_chunk_key)
 
@@ -263,19 +292,21 @@ export default function () {
             await Promise.all(
               chunks_to_load.map(async key => {
                 const { x, z } = from_chunk_key(key)
-                const {
-                  terrain,
-                  enable_collisions,
-                  collider,
-                  dispose,
-                  chunk_border,
-                } = await request_chunk_load({
+                const loaded_chunk = await request_chunk_load({
                   chunk_x: x,
                   chunk_z: z,
                   world,
                   biome,
                   seed,
                 })
+
+                const {
+                  terrain,
+                  enable_collisions,
+                  collider,
+                  dispose,
+                  chunk_border,
+                } = loaded_chunk
 
                 loaded_chunks.set(key, {
                   terrain,
@@ -328,18 +359,74 @@ export default function () {
         },
       )
 
+      // handle low details chunks
+      aiter(abortable(on(events, 'CHANGE_CHUNK', { signal }))).forEach(
+        async current_chunk => {
+          try {
+            const {
+              settings,
+              world: { seed, biome },
+            } = get_state()
+
+            // Determine range for low-detail chunks
+            const new_chunks = spiral_array(
+              current_chunk,
+              settings.view_distance + 1,
+              settings.far_view_distance,
+            ).map(make_chunk_key)
+
+            const chunks_to_load = new_chunks.filter(
+              key => !low_detail_loaded_chunks.has(key),
+            )
+
+            // Load low-detail chunks
+            await Promise.all(
+              chunks_to_load.map(async key => {
+                const { x, z } = from_chunk_key(key)
+                // Calculate the Manhattan distance from the current chunk to the center
+                const distance_from_center =
+                  Math.abs(current_chunk.x - x) + Math.abs(current_chunk.z - z)
+                // Calculate segments based on distance
+                const segments = Math.max(
+                  2,
+                  // 16 >> (distance_from_center - settings.view_distance - 1),
+                  4,
+                )
+
+                const { terrain, dispose } =
+                  await request_low_detail_chunk_load({
+                    chunk_x: x,
+                    chunk_z: z,
+                    biome,
+                    seed,
+                    segments,
+                  })
+
+                low_detail_loaded_chunks.set(key, {
+                  terrain,
+                  dispose,
+                })
+              }),
+            )
+
+            // Add new low-detail terrain to the scene
+            low_detail_loaded_chunks.forEach(({ terrain, dispose }, key) => {
+              if (new_chunks.includes(key)) scene.add(terrain)
+              else {
+                scene.remove(terrain)
+                dispose()
+                low_detail_loaded_chunks.delete(key)
+              }
+            })
+          } catch (error) {
+            console.error(error)
+          }
+        },
+      )
+
       signal.addEventListener('abort', () => {
         sound.stop()
-        loaded_chunks.forEach(({ terrain, collider, dispose }) => {
-          scene.remove(terrain)
-          scene.remove(collider)
-
-          dispose()
-
-          camera_controls.colliderMeshes = []
-        })
-
-        loaded_chunks.clear()
+        reset_chunks()
       })
 
       events.on('packet/entityAction', ({ id, action }) => {

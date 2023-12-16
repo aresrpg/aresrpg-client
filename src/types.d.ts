@@ -54,6 +54,7 @@ declare namespace Type {
     'action/register_player': Entity
     'action/select_character': string
     'action/view_distance': number
+    'action/far_view_distance': number
     'action/biome_settings': {
       scale: number
       height: number
@@ -73,6 +74,7 @@ declare namespace Type {
       CONNECT_TO_SERVER: void // request ws connection to the server
       CHANGE_CHUNK: { x: number; z: number } // change the current chunk
       SET_TIME: number // set the time of the day
+      TIME_CHANGE: number // the time of the day has changed
     } & Packets
   >
 

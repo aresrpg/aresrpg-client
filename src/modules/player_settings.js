@@ -75,6 +75,14 @@ export default function () {
               view_distance: Math.max(2, Math.min(20, payload)),
             },
           }
+        case 'action/far_view_distance':
+          return {
+            ...state,
+            settings: {
+              ...state.settings,
+              far_view_distance: Math.max(2, Math.min(50, payload)),
+            },
+          }
         case 'action/biome_settings':
           return {
             ...state,

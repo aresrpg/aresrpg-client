@@ -15,6 +15,7 @@ import {
 } from 'three'
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
 import { aiter } from 'iterator-helper'
+import CameraControls from 'camera-controls'
 
 import { abortable } from '../utils/iterator.js'
 
@@ -76,6 +77,8 @@ export default function () {
       camera_controls.dollyToCursor = true
       camera_controls.maxDistance = CAMERA_MAX_ZOOM
       camera_controls.minDistance = CAMERA_MIN_ZOOM
+
+      camera_controls.mouseButtons.wheel = CameraControls.ACTION.DOLLY
 
       camera_controls.dolly(8)
       camera_controls.rotate(0, 1)

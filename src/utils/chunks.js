@@ -1,8 +1,12 @@
 import {
+  BackSide,
   BoxGeometry,
+  BufferAttribute,
   BufferGeometry,
   Color,
+  DoubleSide,
   Float32BufferAttribute,
+  FrontSide,
   Group,
   InstancedMesh,
   MathUtils,
@@ -23,13 +27,56 @@ import { WORLD_HEIGHT } from 'aresrpg-protocol/src/chunk.js'
 import Biomes from '../world_gen/biomes.js'
 import greedy_mesh from '../world_gen/greedy_mesh.js'
 
-import { load_gltf, load_obj } from './load_model.js'
-
 const pool = workerpool.pool('src/world_gen/chunk_worker.js', {
   workerOpts: {
     type: 'module',
   },
 })
+
+export async function request_low_detail_chunk_load({
+  chunk_x,
+  chunk_z,
+  seed,
+  biome,
+  segments = 16,
+}) {
+  const { vertices, colors, indices } = await pool.exec(
+    'create_low_detail_chunk_column',
+    [chunk_x, chunk_z, biome, seed, segments],
+  )
+
+  const geometry = new BufferGeometry()
+
+  // Convert vertices, colors, and indices to typed arrays
+  const verticesTypedArray = new Float32Array(vertices)
+  const colorsTypedArray = new Float32Array(colors)
+  const indicesTypedArray = new Uint32Array(indices) // assuming indices are of type number
+
+  // Add vertices, colors, and indices to geometry
+  geometry.setIndex(new BufferAttribute(indicesTypedArray, 1))
+  geometry.setAttribute('position', new BufferAttribute(verticesTypedArray, 3))
+  geometry.setAttribute('color', new BufferAttribute(colorsTypedArray, 3))
+  geometry.computeVertexNormals()
+
+  const material = new MeshPhongMaterial({
+    vertexColors: true,
+    color: new Color(0.4, 0.4, 0.4), // Darken the base color
+    emissive: new Color(0, 0, 0), // No additional light from the material itself
+    specular: new Color(0, 0, 0), // Low specular highlights
+    shininess: 10, // Adjust shininess for the size of the specular highlight
+    side: BackSide,
+  })
+
+  const mesh = new Mesh(geometry, material)
+
+  return {
+    terrain: mesh,
+    dispose() {
+      geometry.dispose()
+      material.dispose()
+    },
+  }
+}
 
 /**
  * @param {Object} Options
@@ -37,7 +84,7 @@ const pool = workerpool.pool('src/world_gen/chunk_worker.js', {
  * @param {number} Options.chunk_z
  * @param {import("@dimforge/rapier3d").World} Options.world
  */
-export default async function request_chunk_load({
+export async function request_chunk_load({
   chunk_x,
   chunk_z,
   world,
@@ -45,7 +92,7 @@ export default async function request_chunk_load({
   biome = Biomes.DEFAULT,
 }) {
   /** @type {{ x: number, y: number, z: number, data: Object }[]} */
-  const volumes = await pool.exec('create_chunk', [
+  const volumes = await pool.exec('create_chunk_column', [
     chunk_x,
     chunk_z,
     biome,
@@ -54,7 +101,9 @@ export default async function request_chunk_load({
 
   // Create an InstancedMesh for rendering
   const voxel_geometry = new BoxGeometry(1, 1, 1)
-  const material = new MeshPhongMaterial()
+  const material = new MeshPhongMaterial({
+    side: FrontSide,
+  })
   const mesh = new InstancedMesh(voxel_geometry, material, volumes.length)
 
   mesh.castShadow = true
