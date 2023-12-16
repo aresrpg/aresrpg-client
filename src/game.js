@@ -29,6 +29,7 @@ import { aiter } from 'iterator-helper'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { World } from '@dimforge/rapier3d'
 import CameraControls from 'camera-controls'
+import { init as init_recast_navigation } from 'recast-navigation'
 
 import { combine } from './utils/iterator.js'
 import ui_fps from './modules/ui_fps.js'
@@ -53,6 +54,8 @@ import Biomes from './world_gen/biomes.js'
 
 export const GRAVITY = 9.81
 export const PLAYER_ID = 'player'
+
+await init_recast_navigation()
 
 const DEBUG_MODE = true
 const LOADING_MANAGER = DefaultLoadingManager
@@ -105,7 +108,8 @@ export const INITIAL_STATE = {
     show_terrain_collider: false,
     show_entities_collider: false,
 
-    view_distance: 3,
+    view_distance: 10,
+    far_view_distance: 35,
     show_chunk_border: false,
 
     free_camera: false,
@@ -188,7 +192,7 @@ async function create_context({ send_packet, connect_ws }) {
   const scene = new Scene()
   const world = new World(new Vector3(0, -GRAVITY, 0))
   scene.background = new Color('#E0E0E0')
-  scene.fog = new Fog('#E0E0E0', 0, 600)
+  scene.fog = new Fog('#E0E0E0', 0, 1500)
 
   const renderer = new WebGLRenderer()
 

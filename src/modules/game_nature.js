@@ -32,7 +32,7 @@ const Colors = {
 export const DAY_DURATION = 600000 // 10 minutes in milliseconds
 const CAMERA_SHADOW_FAR = 500
 const CAMERA_SHADOW_NEAR = 0.1
-const CAMERA_SHADOW_SIZE = 300
+const CAMERA_SHADOW_SIZE = 100
 
 /** @type {Type.Module} */
 export default function () {
@@ -57,9 +57,9 @@ export default function () {
     },
     observe({ scene, renderer, signal, camera, get_state, events }) {
       // lights
-      const ambiant_light = new AmbientLight(0xffffff, 0.5)
+      const ambiant_light = new AmbientLight(0xffffff, 1.5)
 
-      const sunlight = new DirectionalLight(0xffffff, 2)
+      const sunlight = new DirectionalLight(0xffffff, 1)
       const moonlight = new DirectionalLight(0x6666ff, 0) // Initially off
       const sunlight_helper = new DirectionalLightHelper(sunlight, 10)
       const suncamera_helper = new CameraHelper(sunlight.shadow.camera)
@@ -68,8 +68,8 @@ export default function () {
       const mooncamera_helper = new CameraHelper(moonlight.shadow.camera)
 
       sunlight.castShadow = true
-      sunlight.shadow.mapSize.width = 2048 // Adjust as needed for performance/quality
-      sunlight.shadow.mapSize.height = 2048
+      sunlight.shadow.mapSize.width = 4096 // Adjust as needed for performance/quality
+      sunlight.shadow.mapSize.height = 4096
 
       sunlight.shadow.camera.near = CAMERA_SHADOW_NEAR
       sunlight.shadow.camera.far = CAMERA_SHADOW_FAR
@@ -100,11 +100,11 @@ export default function () {
       scene.add(ambiant_light)
       scene.add(sunlight)
       scene.add(sunlight.target)
-      scene.add(moonlight)
-      scene.add(moonlight.target)
-
       scene.add(sunlight_helper)
       scene.add(suncamera_helper)
+
+      scene.add(moonlight)
+      scene.add(moonlight.target)
       scene.add(moonlight_helper)
       scene.add(mooncamera_helper)
 
@@ -175,8 +175,8 @@ export default function () {
           water.material.uniforms.sunDirection.value.copy(sun).normalize()
 
           // Calculate the sun and moon position relative to the base position
-          const sun_position_offset = sun.clone().multiplyScalar(300)
-          const moon_position_offset = sun.clone().negate().multiplyScalar(300)
+          const sun_position_offset = sun.clone().multiplyScalar(200)
+          const moon_position_offset = sun.clone().negate().multiplyScalar(200)
 
           sunlight.position.copy(light_base_position).add(sun_position_offset)
           sunlight.target.position.copy(light_target_position)
@@ -188,19 +188,17 @@ export default function () {
           const intensity = Math.cos(normalized_phi * Math.PI) * 0.5 + 0.5
 
           sunlight.intensity = Math.max(0, intensity)
-          ambiant_light.intensity = Math.max(0.2, intensity * 0.5)
+          ambiant_light.intensity = Math.max(0.2, intensity)
           moonlight.intensity = is_night ? 1 : 0 // Adjust intensity based on night/day
 
           if (!is_night) {
-            sunlight.color = Colors.sunrise.lerp(
-              Colors.noon,
-              sky_elevation / 90,
-            )
+            const color = Colors.sunrise.lerp(Colors.noon, sky_elevation / 90)
+            sunlight.color = color
+            scene.fog.color = color
           } else {
-            sunlight.color = Colors.sunset.lerp(
-              Colors.night,
-              -sky_elevation / 90,
-            )
+            const color = Colors.sunset.lerp(Colors.night, -sky_elevation / 90)
+            sunlight.color = color
+            scene.fog.color = color
           }
 
           // Update environment map
@@ -210,6 +208,8 @@ export default function () {
           scene_env.add(sky)
           render_target = pmrem_generator.fromScene(scene_env)
           scene.environment = render_target.texture
+
+          events.emit('TIME_CHANGE', day_time)
         },
       )
     },

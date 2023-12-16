@@ -24,7 +24,7 @@ function is_chunk_empty({ chunk_x, chunk_z, row, heightfield }) {
 
 function is_voxel_exposed({ x, y, z, heightfield }) {
   return (
-    heightfield(x, z) === y ||
+    Math.round(heightfield(x, z)) === Math.round(y) ||
     heightfield(x - 1, z) < y ||
     heightfield(x + 1, z) < y ||
     heightfield(x, z - 1) < y ||
@@ -77,7 +77,7 @@ function create_chunk({ chunk_x, chunk_z, row, heightfield, column }) {
   }
 }
 
-export default function create_chunk_column(chunk_x, chunk_z, biome, seed) {
+export function create_chunk_column(chunk_x, chunk_z, biome, seed) {
   const row_amount = WORLD_HEIGHT / CHUNK_SIZE
   const column = ndarray(new Array(CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE), [
     CHUNK_SIZE,
@@ -99,4 +99,60 @@ export default function create_chunk_column(chunk_x, chunk_z, biome, seed) {
   }
 
   return greedy_mesh(column)
+}
+
+function unpack_color(hex) {
+  const r = ((hex >> 16) & 255) / 255 // Extract the RR byte and normalize
+  const g = ((hex >> 8) & 255) / 255 // Extract the GG byte and normalize
+  const b = (hex & 255) / 255 // Extract the BB byte and normalize
+  return [r, g, b]
+}
+
+export function create_low_detail_chunk_column(
+  chunk_x,
+  chunk_z,
+  biome,
+  seed,
+  segments,
+) {
+  const heightfield = create_fractionnal_brownian(biome, seed)
+  const vertices = []
+  const colors = []
+  const indices = []
+
+  // Segment size is the real world size of each grid square
+  const segment_size = CHUNK_SIZE / segments
+
+  // Generate grid vertices and color data
+  for (let i = 0; i <= segments; i++) {
+    for (let j = 0; j <= segments; j++) {
+      const x = chunk_x * CHUNK_SIZE + i * segment_size
+      const z = chunk_z * CHUNK_SIZE + j * segment_size
+      const y = heightfield(x, z)
+
+      // Push the vertex position
+      vertices.push(x, y, z)
+
+      // Get color data for the vertex
+      const { color } = get_voxel_data({ x, y, z })
+      colors.push(...unpack_color(color))
+    }
+  }
+
+  // Generate indices for the grid vertices
+  for (let i = 0; i < segments; i++) {
+    for (let j = 0; j < segments; j++) {
+      // Get the indices of the corners of a grid square
+      const a = i * (segments + 1) + j
+      const b = a + segments + 1
+      const c = a + 1
+      const d = b + 1
+
+      // Create two triangles (quad) for each grid square
+      indices.push(a, b, c)
+      indices.push(b, d, c)
+    }
+  }
+
+  return { vertices, colors, indices }
 }

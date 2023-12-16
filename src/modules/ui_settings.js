@@ -88,6 +88,11 @@ export default function () {
         .onFinishChange(handle_change('action/view_distance'))
 
       terrain_folder
+        .add(settings, 'far_view_distance', 2, 50, 1)
+        .name('Far view distance')
+        .onFinishChange(handle_change('action/far_view_distance'))
+
+      terrain_folder
         .add(settings, 'show_chunk_border')
         .name('Show Chunk Border')
         .onFinishChange(handle_change('action/show_chunk_border'))
