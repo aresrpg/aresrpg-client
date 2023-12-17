@@ -1,6 +1,7 @@
 import {
   AnimationMixer,
   Box3,
+  BoxGeometry,
   CapsuleGeometry,
   Line3,
   LoopOnce,
@@ -13,12 +14,12 @@ import {
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { RigidBodyDesc, ColliderDesc } from '@dimforge/rapier3d'
 
-import step1 from './assets/step1.ogg'
-import step2 from './assets/step2.ogg'
-import step3 from './assets/step3.ogg'
-import step4 from './assets/step4.ogg'
-import step5 from './assets/step5.ogg'
-import step6 from './assets/step6.ogg'
+import step1 from './assets/sound/step1.ogg'
+import step2 from './assets/sound/step2.ogg'
+import step3 from './assets/sound/step3.ogg'
+import step4 from './assets/sound/step4.ogg'
+import step5 from './assets/sound/step5.ogg'
+import step6 from './assets/sound/step6.ogg'
 import {
   MODEL_SCALE,
   load_fbx_animation,
@@ -105,7 +106,7 @@ export default function create_pools({ scene, world }) {
       const cloned_body = clone(model)
       const body = new Object3D()
 
-      const collider_geometry = new CapsuleGeometry(radius, height * 0.8, 1, 20)
+      const collider_geometry = new BoxGeometry(radius, height * 1.3, radius)
       const collider_mesh = new Mesh(
         collider_geometry,
         new MeshBasicMaterial({
@@ -205,7 +206,11 @@ export default function create_pools({ scene, world }) {
         if (!add_rigid_body) return base_entity
 
         const rigid_body_descriptor = RigidBodyDesc.kinematicPositionBased()
-        const collider_descriptor = ColliderDesc.capsule(height * 0.3, radius)
+        const collider_descriptor = ColliderDesc.cuboid(
+          radius,
+          height * 0.9,
+          radius,
+        )
         const rigid_body = world.createRigidBody(rigid_body_descriptor)
         const collider = world.createCollider(collider_descriptor, rigid_body)
 
@@ -215,7 +220,7 @@ export default function create_pools({ scene, world }) {
           collider,
           move(position) {
             rigid_body.setNextKinematicTranslation(position)
-            body.position.copy(position).add(new Vector3(0, height / 2, 0))
+            body.position.copy(position)
           },
           remove() {
             body.visible = false

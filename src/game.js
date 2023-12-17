@@ -109,10 +109,8 @@ export const INITIAL_STATE = {
     show_entities_collider: false,
     show_navmesh: false,
 
-    // view_distance: 10,
-    // far_view_distance: 35,
-    view_distance: 3,
-    far_view_distance: 5,
+    view_distance: 10,
+    far_view_distance: 35,
     show_chunk_border: false,
 
     free_camera: false,

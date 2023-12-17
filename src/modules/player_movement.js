@@ -20,7 +20,8 @@ import { abortable } from '../utils/iterator'
 import { compute_animation_state } from '../utils/animation.js'
 
 const SPEED = 7
-const JUMP_FORCE = 23
+const JUMP_FORCE = 12
+const CONTROLLER_OFFSET = 0.01
 const ASCENT_GRAVITY_FACTOR = 3
 const APEX_GRAVITY_FACTOR = 0.3
 const DESCENT_GRAVITY_FACTOR = 5
@@ -92,7 +93,18 @@ function compute_and_play_animation({
 /** @type {Type.Module} */
 export default function ({ world }) {
   const velocity = new Vector3()
+  const controller = world.createCharacterController(CONTROLLER_OFFSET)
   const model_forward = new Vector3(0, 0, 1)
+
+  // Don’t allow climbing slopes larger than 45 degrees.
+  controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180)
+  // Automatically slide down on slopes smaller than 30 degrees.
+  controller.setMinSlopeSlideAngle((30 * Math.PI) / 180)
+
+  controller.enableAutostep(1.1, 0.3, false)
+  controller.enableSnapToGround(1)
+  // controller.setCharacterMass(100)
+  // controller.setSlideEnabled(true)
 
   let jump_state = jump_states.NONE
   let jump_cooldown = 0
@@ -103,11 +115,7 @@ export default function ({ world }) {
 
   return {
     name: 'player_movements',
-    tick(
-      { inputs, player },
-      { camera, send_packet, events, navigation },
-      delta,
-    ) {
+    tick({ inputs, player }, { camera, send_packet, events }, delta) {
       if (!player) return
 
       const {
@@ -204,42 +212,15 @@ export default function ({ world }) {
       }
 
       movement.addScaledVector(velocity, delta)
-      const target_position = position.clone().add(movement)
 
-      const { nearestRef } = navigation.navmesh_query.findNearestPoly(position)
-      const {
-        success: movement_success,
-        resultPosition,
-        visited,
-      } = navigation.navmesh_query.moveAlongSurface(
-        nearestRef,
-        position,
-        target_position,
-      )
+      controller.computeColliderMovement(collider, movement)
+      on_ground = controller.computedGrounded()
 
-      const move_along_surface_final_referance = visited.at(-1)
-      const { success: height_sucess, height } =
-        navigation.navmesh_query.getPolyHeight(
-          move_along_surface_final_referance,
-          resultPosition,
-        )
-
-      const found_path = movement_success && height_sucess
-
-      if (height_sucess) resultPosition.y = height
-
-      on_ground = height_sucess
-
-      const new_position = found_path
-        ? new Vector3().copy(resultPosition)
-        : position.clone().add(movement)
-
-      // if (movement.y > 0) {
-      //   new_position.add(new Vector3(0, movement.y, 0))
-      // }
+      const { x, y, z } = controller.computedMovement()
+      const corrected_movement = new Vector3(x, y, z)
 
       const is_moving_horizontally =
-        inputs.forward || inputs.backward || inputs.left || inputs.right
+        inputs.forward || inputs.backward || inputs.right || inputs.left
 
       if (inputs.dance && !is_dancing) {
         is_dancing = true
@@ -247,23 +228,29 @@ export default function ({ world }) {
       }
 
       if (is_moving_horizontally) {
-        player.rotate(new_position.clone().sub(position))
+        player.rotate(movement)
         is_dancing = false
       }
 
       const animation_name = compute_animation_state({
         is_jumping: jump_state === jump_states.ASCENT,
-        is_on_ground: height_sucess,
+        is_on_ground: on_ground,
         is_moving_horizontally,
         is_dancing: inputs.dance,
       })
 
-      if (
-        new Vector3().copy(new_position).distanceToSquared(position) > 0.001
-      ) {
-        player.move(new_position)
+      const new_position = new Vector3(
+        position.x + corrected_movement.x,
+        position.y + corrected_movement.y,
+        position.z + corrected_movement.z,
+      )
+
+      if (is_moving_horizontally || !on_ground)
         player.animate(animation_name, delta)
-      } else player.animate(inputs.dance ? 'DANCE' : 'IDLE', delta)
+      else player.animate(inputs.dance ? 'DANCE' : 'IDLE', delta)
+
+      if (new_position.distanceToSquared(position) > 0.001)
+        player.move(new_position)
 
       const last_chunk = to_chunk_position(position)
       const current_chunk = to_chunk_position(new_position)

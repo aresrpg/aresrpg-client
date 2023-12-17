@@ -16,7 +16,7 @@ import {
 } from 'aresrpg-protocol/src/chunk.js'
 import { aiter, iter } from 'iterator-helper'
 
-import pandala from '../assets/pandala.wav'
+import main_theme from '../assets/sound/main_theme.mp3'
 import { PLAYER_ID } from '../game.js'
 import { compute_animation_state } from '../utils/animation.js'
 import log from '../utils/logger.js'
@@ -39,7 +39,7 @@ const audio_loader = new AudioLoader()
 
 const MOVE_UPDATE_INTERVAL = 0.1
 
-const audio_buffer = await audio_loader.loadAsync(pandala)
+const audio_buffer = await audio_loader.loadAsync(main_theme)
 
 sound.setBuffer(audio_buffer)
 sound.setLoop(true)
@@ -195,7 +195,7 @@ export default function () {
 
             dispose()
 
-            // enable_collisions(false)
+            enable_collisions(false)
           },
         )
         loaded_chunks.clear()
@@ -378,22 +378,14 @@ export default function () {
             // Add new terrain and remove old terrain from the scene
             loaded_chunks.forEach(
               (
-                {
-                  terrain,
-                  collider,
-                  dispose,
-                  enable_collisions,
-                  chunk_border,
-                  vertices,
-                  indices,
-                },
+                { terrain, collider, dispose, enable_collisions, chunk_border },
                 key,
               ) => {
                 if (chunks_with_collisions.includes(key)) {
-                  // enable_collisions(true)
+                  enable_collisions(true)
                   scene.add(collider)
                 } else {
-                  // enable_collisions(false)
+                  enable_collisions(false)
                   scene.remove(collider)
                 }
 

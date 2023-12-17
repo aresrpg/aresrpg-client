@@ -38,10 +38,10 @@ export default function () {
       if (!player) return
 
       if (!free_camera) {
-        const position = player.position()
+        const { x, y, z } = player.position()
 
-        camera_controls.moveTo(position.x, position.y, position.z)
-        camera_controls.setTarget(position.x, position.y, position.z)
+        camera_controls.moveTo(x, y, z, true)
+        camera_controls.setTarget(x, y, z, true)
       }
 
       camera_controls.update(delta)
@@ -77,6 +77,7 @@ export default function () {
       camera_controls.dollyToCursor = true
       camera_controls.maxDistance = CAMERA_MAX_ZOOM
       camera_controls.minDistance = CAMERA_MIN_ZOOM
+      camera_controls.smoothTime = 0.1
 
       camera_controls.mouseButtons.wheel = CameraControls.ACTION.DOLLY
 
