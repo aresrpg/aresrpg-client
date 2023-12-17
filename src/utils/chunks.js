@@ -16,6 +16,7 @@ import {
   MeshPhongMaterial,
   MeshStandardMaterial,
   MeshToonMaterial,
+  Uint32BufferAttribute,
   Vector3,
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -26,6 +27,7 @@ import { WORLD_HEIGHT } from 'aresrpg-protocol/src/chunk.js'
 
 import Biomes from '../world_gen/biomes.js'
 import greedy_mesh from '../world_gen/greedy_mesh.js'
+import { from_chunk_key } from '../modules/game_world.js'
 
 const pool = workerpool.pool('src/world_gen/chunk_worker.js', {
   workerOpts: {
@@ -33,49 +35,73 @@ const pool = workerpool.pool('src/world_gen/chunk_worker.js', {
   },
 })
 
-export async function request_low_detail_chunk_load({
-  chunk_x,
-  chunk_z,
-  seed,
-  biome,
-  segments = 16,
-}) {
-  const { vertices, colors, indices } = await pool.exec(
-    'create_low_detail_chunk_column',
-    [chunk_x, chunk_z, biome, seed, segments],
+const SEGMENTS = 16
+
+export async function request_low_detail_chunks_load({ chunks, seed, biome }) {
+  const geometries_data = await Promise.all(
+    chunks.map(async key => {
+      const { x, z } = from_chunk_key(key)
+
+      const { vertices, colors, indices } = await pool.exec(
+        'create_low_detail_chunk_column',
+        [x, z, biome, seed, SEGMENTS],
+      )
+
+      // Convert vertices, colors, and indices to typed arrays
+      const vertices_array = new Float32Array(vertices)
+      const colors_array = new Float32Array(colors)
+      const indices_array = new Uint32Array(indices) // assuming indices are of type number
+
+      return {
+        vertices: vertices_array,
+        colors: colors_array,
+        indices: indices_array,
+      }
+    }),
   )
+
+  const total_vertices = geometries_data.reduce(
+    (acc, data) => acc + data.vertices.length,
+    0,
+  )
+  const total_colors = geometries_data.reduce(
+    (acc, data) => acc + data.colors.length,
+    0,
+  )
+  const total_indices = geometries_data.reduce(
+    (acc, data) => acc + data.indices.length,
+    0,
+  )
+
+  // Create SharedArrayBuffers
+  const vertices_buffer = new SharedArrayBuffer(total_vertices * 4) // Float32 needs 4 bytes
+  const colors_buffer = new SharedArrayBuffer(total_colors * 4) // Float32 needs 4 bytes
+  const indices_buffer = new SharedArrayBuffer(total_indices * 4) // Assuming Uint32
+
+  const shallow_geometry = await pool.exec('merge_geometries', [
+    geometries_data,
+    {
+      vertices_buffer,
+      colors_buffer,
+      indices_buffer,
+    },
+  ])
 
   const geometry = new BufferGeometry()
 
-  // Convert vertices, colors, and indices to typed arrays
-  const verticesTypedArray = new Float32Array(vertices)
-  const colorsTypedArray = new Float32Array(colors)
-  const indicesTypedArray = new Uint32Array(indices) // assuming indices are of type number
+  geometry.setAttribute(
+    'position',
+    new Float32BufferAttribute(new Float32Array(vertices_buffer), 3),
+  )
+  geometry.setAttribute(
+    'color',
+    new Float32BufferAttribute(new Float32Array(colors_buffer), 3),
+  )
+  geometry.setIndex(
+    new Uint32BufferAttribute(new Uint32Array(indices_buffer), 1),
+  )
 
-  // Add vertices, colors, and indices to geometry
-  geometry.setIndex(new BufferAttribute(indicesTypedArray, 1))
-  geometry.setAttribute('position', new BufferAttribute(verticesTypedArray, 3))
-  geometry.setAttribute('color', new BufferAttribute(colorsTypedArray, 3))
-  geometry.computeVertexNormals()
-
-  const material = new MeshPhongMaterial({
-    vertexColors: true,
-    color: new Color(0.4, 0.4, 0.4), // Darken the base color
-    emissive: new Color(0, 0, 0), // No additional light from the material itself
-    specular: new Color(0, 0, 0), // Low specular highlights
-    shininess: 10, // Adjust shininess for the size of the specular highlight
-    side: BackSide,
-  })
-
-  const mesh = new Mesh(geometry, material)
-
-  return {
-    terrain: mesh,
-    dispose() {
-      geometry.dispose()
-      material.dispose()
-    },
-  }
+  return geometry
 }
 
 /**
@@ -171,6 +197,7 @@ export async function request_chunk_load({
     new Float32BufferAttribute(collision_vertices, 3),
   )
   collision_geometry.setIndex(collision_indices)
+
   const collider_mesh = new Mesh(
     collision_geometry,
     new MeshStandardMaterial({

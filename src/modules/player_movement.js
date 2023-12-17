@@ -113,6 +113,8 @@ export default function ({ world }) {
 
   let is_dancing = false
 
+  let chunks_loaded = false
+
   return {
     name: 'player_movements',
     tick({ inputs, player }, { camera, send_packet, events }, delta) {
@@ -134,7 +136,10 @@ export default function ({ world }) {
 
       if (player.target_position) {
         player.move(player.target_position)
+        events.emit('CHANGE_CHUNK', to_chunk_position(player.target_position))
+
         player.target_position = null
+
         return
       }
 
@@ -142,7 +147,7 @@ export default function ({ world }) {
       // TODO: tp to nether if falling to hell
       if (position.y <= -30) {
         velocity.setScalar(0)
-        player.move(new Vector3(0, 100, 0))
+        player.move(new Vector3(position.x, 100, position.z))
         return
       }
 
@@ -207,8 +212,8 @@ export default function ({ world }) {
           break
         case jump_states.NONE:
         default:
-          // if not jumping, apply normal gravity
-          velocity.y -= GRAVITY * delta
+          // if not jumping, apply normal gravity as long as chunks are there
+          if (chunks_loaded) velocity.y -= GRAVITY * delta
       }
 
       movement.addScaledVector(velocity, delta)
@@ -292,6 +297,10 @@ export default function ({ world }) {
         },
         new Vector3(),
       )
+
+      events.on('CHUNKS_LOADED', () => {
+        if (!chunks_loaded) chunks_loaded = true
+      })
     },
   }
 }

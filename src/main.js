@@ -4,6 +4,7 @@ import { BufferGeometry, Mesh } from 'three'
 import Vuesax from 'vuesax-alpha'
 import 'vuesax-alpha/dist/index.css'
 import 'vuesax-alpha/theme-chalk/dark/css-vars.css'
+import 'boxicons'
 import { inject } from '@vercel/analytics'
 
 // @ts-ignore

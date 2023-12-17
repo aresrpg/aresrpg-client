@@ -11,9 +11,9 @@ export function create_fractionnal_brownian(biome, seed) {
   const noise_pass_2 = createNoise2D(alea(`${seed}_2`))
   const noise_pass_3 = createNoise2D(alea(`${seed}_3`))
   return (x, y) => {
-    const key = `${x}:${y}:${JSON.stringify(biome)}:${seed}`
+    // const key = `${x}:${y}:${JSON.stringify(biome)}:${seed}`
 
-    if (memoized.has(key)) return memoized.get(key)
+    // if (memoized.has(key)) return memoized.get(key)
 
     const xs = x / scale
     const ys = y / scale
@@ -40,7 +40,7 @@ export function create_fractionnal_brownian(biome, seed) {
     total *= height
     total = Math.floor(total)
 
-    memoized.set(key, total)
+    // memoized.set(key, total)
 
     return total
   }

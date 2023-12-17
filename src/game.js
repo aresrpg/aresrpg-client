@@ -206,8 +206,6 @@ async function create_context({ send_packet, connect_ws }) {
 
   const renderer = new WebGLRenderer()
 
-  const Pool = await create_pools({ scene, world })
-
   renderer.setPixelRatio(window.devicePixelRatio)
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setClearColor(0x263238 / 2, 1)
@@ -226,6 +224,7 @@ async function create_context({ send_packet, connect_ws }) {
     2000, // Far clipping plane
   )
 
+  const Pool = await create_pools({ scene, world, camera })
   const orthographic_camera = new OrthographicCamera()
 
   camera.far = 2000
@@ -358,7 +357,7 @@ export default async function create_game({
         const state = get_state()
         const delta_seconds = game_delta / 1000
 
-        world.step()
+        if (state.game_state === 'GAME') world.step()
 
         permanent_modules
           .map(({ tick }) => tick)
