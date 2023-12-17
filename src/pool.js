@@ -13,6 +13,8 @@ import {
 } from 'three'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { RigidBodyDesc, ColliderDesc } from '@dimforge/rapier3d'
+import { Text } from 'troika-three-text'
+import { createDerivedMaterial } from 'troika-three-utils'
 
 import step1 from './assets/sound/step1.ogg'
 import step2 from './assets/sound/step2.ogg'
@@ -41,6 +43,42 @@ const throttle = (action, interval) => {
       action(...args)
     }
   }
+}
+
+function create_billboard_material(baseMaterial, keep_aspect) {
+  return createDerivedMaterial(baseMaterial, {
+    // Declaring custom uniforms
+    uniforms: {
+      uSize: { value: keep_aspect ? 0.1 : 0.15 },
+      uScale: { value: 1 },
+    },
+    // Adding GLSL code to the vertex shader's top-level definitions
+    vertexDefs: `
+uniform float uSize;
+uniform float uScale;
+`,
+    // Adding GLSL code at the end of the vertex shader's main function
+    vertexMainOutro: keep_aspect
+      ? `
+vec4 mvPosition = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+float distance = length(-mvPosition.xyz);
+float computedScale = uSize * uScale * distance;
+mvPosition.xyz += position * computedScale;
+gl_Position = projectionMatrix * mvPosition;
+`
+      : `
+vec4 mvPosition = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
+vec3 scale = vec3(
+  length(modelViewMatrix[0].xyz),
+  length(modelViewMatrix[1].xyz),
+  length(modelViewMatrix[2].xyz)
+  );
+// size attenuation: scale *= -mvPosition.z * 0.2;
+mvPosition.xyz += position * scale;
+gl_Position = projectionMatrix * mvPosition;
+`,
+    // No need to modify fragment shader for billboarding effect
+  })
 }
 
 const MODEL_FORWARD = new Vector3(0, 0, 1)
@@ -143,7 +181,7 @@ export default function create_pools({ scene, world }) {
     return {
       data,
       /** @type {(options: { add_rigid_body: boolean }) => Type.Entity} */
-      get({ add_rigid_body } = {}) {
+      get({ add_rigid_body, fixed_title_aspect } = {}) {
         const body = data.find(object => !object.visible)
 
         if (!body) throw new Error('No more models available')
@@ -165,14 +203,33 @@ export default function create_pools({ scene, world }) {
 
         current_animation.reset().play()
 
+        const title = new Text()
+
+        title.fontSize = 0.2
+        title.color = 'white'
+        title.anchorX = 'center'
+        title.outlineWidth = 0.02
+        title.material = create_billboard_material(
+          new MeshBasicMaterial(),
+          fixed_title_aspect,
+        )
+
+        scene.add(title)
+
         const base_entity = {
+          title,
           three_body: body,
           height,
           radius,
           move(position) {
             body.position.copy(position)
+            title.position.copy(position).add(new Vector3(0, height * 1.4, 0))
           },
           remove() {
+            scene.remove(title)
+
+            title.geometry.dispose()
+
             body.visible = false
           },
           rotate(movement) {
@@ -220,12 +277,12 @@ export default function create_pools({ scene, world }) {
           collider,
           move(position) {
             rigid_body.setNextKinematicTranslation(position)
-            body.position.copy(position)
+            base_entity.move(position)
           },
           remove() {
-            body.visible = false
             world.removeCollider(collider, false)
             world.removeRigidBody(rigid_body)
+            base_entity.remove()
           },
           position() {
             const { x, y, z } = rigid_body.translation()

@@ -24,6 +24,7 @@ declare namespace Type {
 
   type Entity = {
     id: string
+    title: import('troika-three-text').Text
     three_body: import('three').Object3D
     rapier_body: {
       rigid_body: import('@dimforge/rapier3d').RigidBody
@@ -86,6 +87,7 @@ declare namespace Type {
       SET_TIME: number // set the time of the day
       TIME_CHANGE: number // the time of the day has changed
       CLEAR_CHUNKS: void // clear all chunks
+      CHUNKS_LOADED: void // notify that the loading of new chunks is finished
     } & Packets
   >
 

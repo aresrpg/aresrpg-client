@@ -142,15 +142,24 @@ export default function () {
         day_time = time
       })
 
+      function get_player_chunk_position() {
+        try {
+          const player = get_state()?.player
+          if (!player) return new Vector3()
+          return to_chunk_position(player.position())
+        } catch (error) {
+          console.error(error)
+          return new Vector3()
+        }
+      }
+
       aiter(abortable(setInterval(day_time_step, null, { signal }))).forEach(
         () => {
           // Update day_time and calculate day_ratio
           day_time = (day_time + day_time_step) % DAY_DURATION
           const day_ratio = day_time / DAY_DURATION
 
-          const chunk_position = to_chunk_position(
-            get_state()?.player?.position() ?? new Vector3(),
-          )
+          const chunk_position = get_player_chunk_position()
 
           const light_base_position = new Vector3(
             chunk_position.x * CHUNK_SIZE,

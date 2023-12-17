@@ -3,6 +3,12 @@
   nav
     img.logo(:src="logo")
     .version build {{ pkg.version }}
+  .infos(v-if="menu_type === 'PLAY'")
+    vs-alert(color="#3498DB" type="gradient")
+      | We moved away from Minecraft as it was too limited for our needs. We are now using our own game engine, which allows us to do much more. We are still in early development, but we are working hard to bring you the best experience possible. Stay tuned!
+      | #[b If you own an early access key, you can already connect to the game and follow the development.]
+      template(#title) AresRPG is now a standalone game!
+
   .menu_play(v-if="menu_type === 'PLAY'")
     img.logo(:src="text_logo")
     .btns
@@ -171,6 +177,17 @@ a
       font-weight 900
       font-size .8em
       color #212121
+
+  .infos
+    position absolute
+    top 1em
+    left 50%
+    transform translateX(-50%)
+    b
+      display flex
+      padding-top 1em
+      text-decoration underline
+
 
   .menu_characters
     position absolute

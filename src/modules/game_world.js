@@ -4,7 +4,11 @@ import {
   Audio,
   AudioListener,
   AudioLoader,
+  BackSide,
+  Color,
+  Mesh,
   MeshBasicMaterial,
+  MeshPhongMaterial,
   Quaternion,
   Vector3,
 } from 'three'
@@ -15,6 +19,7 @@ import {
   CHUNK_SIZE,
 } from 'aresrpg-protocol/src/chunk.js'
 import { aiter, iter } from 'iterator-helper'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 import main_theme from '../assets/sound/main_theme.mp3'
 import { PLAYER_ID } from '../game.js'
@@ -22,13 +27,13 @@ import { compute_animation_state } from '../utils/animation.js'
 import log from '../utils/logger.js'
 import {
   request_chunk_load,
-  request_low_detail_chunk_load,
+  request_low_detail_chunks_load,
 } from '../utils/chunks'
 import { abortable } from '../utils/iterator'
 import { create_navmesh } from '../utils/navmesh'
 
 const make_chunk_key = ({ x, z }) => `${x}:${z}`
-const from_chunk_key = key => {
+export const from_chunk_key = key => {
   const [x, z] = key.split(':')
   return { x: +x, z: +z }
 }
@@ -38,6 +43,7 @@ const sound = new Audio(listener)
 const audio_loader = new AudioLoader()
 
 const MOVE_UPDATE_INTERVAL = 0.1
+const MAX_TITLE_VIEW_DISTANCE = CHUNK_SIZE * 1.3
 
 const audio_buffer = await audio_loader.loadAsync(main_theme)
 
@@ -50,7 +56,7 @@ export default function () {
   /** @typedef {{ terrain: import("three").Mesh, collider: import("three").Mesh, enable_collisions: (x: boolean) => void}} chunk */
   /** @type {Map<string, chunk>} chunk position to chunk */
   const loaded_chunks = new Map()
-  const low_detail_loaded_chunks = new Map()
+  let low_detail_plane = null
   const entities = new Map()
 
   return {
@@ -200,21 +206,30 @@ export default function () {
         )
         loaded_chunks.clear()
 
-        low_detail_loaded_chunks.forEach(({ terrain, dispose }) => {
-          scene.remove(terrain)
-          dispose()
-        })
-
-        low_detail_loaded_chunks.clear()
+        if (low_detail_plane) {
+          scene.remove(low_detail_plane)
+          low_detail_plane.geometry.dispose()
+          low_detail_plane.material.dispose()
+          low_detail_plane = null
+        }
 
         camera_controls.colliderMeshes = []
       }
 
-      events.once('STATE_UPDATED', () => {
+      events.once('STATE_UPDATED', ({ selected_character_id, characters }) => {
         sound.play()
-        const player = Pool.guard.get({ add_rigid_body: true })
+        const player = Pool.guard.get({
+          add_rigid_body: true,
+          fixed_title_aspect: true,
+        })
 
         player.three_body.position.setScalar(0)
+
+        const selected_character = characters.find(
+          ({ id }) => id === selected_character_id,
+        )
+
+        player.title.text = selected_character.name
 
         dispatch('action/register_player', {
           ...player,
@@ -227,10 +242,13 @@ export default function () {
         })
       })
 
-      events.on('packet/entitySpawn', ({ id, position, type }) => {
-        if (type === 0) {
+      events.on('packet/entitySpawn', ({ id, position, type, name }) => {
+        if (entities.has(id)) return
+
+        if (type === 'PLAYER') {
           const entity = Pool.guard.get()
           entity.id = id
+          entity.title.text = name
           entity.move(position)
           entities.set(id, entity)
         }
@@ -247,7 +265,21 @@ export default function () {
       events.on('packet/entityMove', ({ id, position }) => {
         const entity = entities.get(id)
         const { x, y, z } = position
-        if (entity) entity.target_position = new Vector3(x, y, z)
+        const state = get_state()
+        if (entity) {
+          entity.target_position = new Vector3(x, y, z)
+          if (state.player) {
+            const position = state.player.position()
+            const distance = position.distanceTo(new Vector3(x, y, z))
+            if (distance > MAX_TITLE_VIEW_DISTANCE && entity.title.visible)
+              entity.title.visible = false
+            else if (
+              distance <= MAX_TITLE_VIEW_DISTANCE &&
+              !entity.title.visible
+            )
+              entity.title.visible = true
+          }
+        }
       })
 
       events.on('CLEAR_CHUNKS', () => {
@@ -329,7 +361,7 @@ export default function () {
               settings,
               world: { seed, biome },
             } = get_state()
-            const chunks_with_collisions = square_array(current_chunk, 1).map(
+            const chunks_with_collisions = square_array(current_chunk, 2).map(
               make_chunk_key,
             )
             const new_chunks = spiral_array(
@@ -426,51 +458,38 @@ export default function () {
               settings.far_view_distance,
             ).map(make_chunk_key)
 
-            const chunks_to_load = new_chunks.filter(
-              key => !low_detail_loaded_chunks.has(key),
-            )
+            const geometries = []
 
-            // Load low-detail chunks
-            await Promise.all(
-              chunks_to_load.map(async key => {
-                const { x, z } = from_chunk_key(key)
-                // Calculate the Manhattan distance from the current chunk to the center
-                const distance_from_center =
-                  Math.abs(current_chunk.x - x) + Math.abs(current_chunk.z - z)
-                // Calculate segments based on distance
-                const segments = Math.max(
-                  2,
-                  // 16 >> (distance_from_center - settings.view_distance - 1),
-                  4,
-                )
+            const low_detail_plane_geometry =
+              await request_low_detail_chunks_load({
+                chunks: new_chunks,
+                biome,
+                seed,
+              })
 
-                const { terrain, dispose } =
-                  await request_low_detail_chunk_load({
-                    chunk_x: x,
-                    chunk_z: z,
-                    biome,
-                    seed,
-                    segments,
-                  })
+            if (low_detail_plane) {
+              scene.remove(low_detail_plane)
+              low_detail_plane.geometry.dispose()
+              low_detail_plane.material.dispose()
+            }
 
-                low_detail_loaded_chunks.set(key, {
-                  terrain,
-                  dispose,
-                })
+            low_detail_plane = new Mesh(
+              low_detail_plane_geometry,
+              new MeshPhongMaterial({
+                vertexColors: true,
+                color: new Color(0.4, 0.4, 0.4), // Darken the base color
+                emissive: new Color(0, 0, 0), // No additional light from the material itself
+                specular: new Color(0, 0, 0), // Low specular highlights
+                shininess: 10, // Adjust shininess for the size of the specular highlight
+                side: BackSide,
               }),
             )
 
-            // Add new low-detail terrain to the scene
-            low_detail_loaded_chunks.forEach(({ terrain, dispose }, key) => {
-              if (new_chunks.includes(key)) scene.add(terrain)
-              else {
-                scene.remove(terrain)
-                dispose()
-                low_detail_loaded_chunks.delete(key)
-              }
-            })
+            scene.add(low_detail_plane)
           } catch (error) {
             console.error(error)
+          } finally {
+            events.emit('CHUNKS_LOADED')
           }
         },
       )
