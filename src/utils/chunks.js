@@ -28,8 +28,9 @@ import { WORLD_HEIGHT } from 'aresrpg-protocol/src/chunk.js'
 import Biomes from '../world_gen/biomes.js'
 import greedy_mesh from '../world_gen/greedy_mesh.js'
 import { from_chunk_key } from '../modules/game_world.js'
+import chunk_worker from '../world_gen/chunk_worker.js?worker&url'
 
-const pool = workerpool.pool('src/world_gen/chunk_worker.js', {
+const pool = workerpool.pool(chunk_worker, {
   workerOpts: {
     type: 'module',
   },
