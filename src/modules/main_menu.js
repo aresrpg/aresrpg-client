@@ -1,7 +1,7 @@
 import { Audio, AudioListener, AudioLoader, Vector3 } from 'three'
 
 import Grass from '../grass/grass.js'
-import manracni from '../assets/manracni.mp3'
+import manracni from '../assets/sound/manracni.mp3'
 import dispose from '../utils/dispose.js'
 
 const grass = new Grass(30, 100000)
