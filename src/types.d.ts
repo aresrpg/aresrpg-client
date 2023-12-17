@@ -65,6 +65,16 @@ declare namespace Type {
     }
     'action/show_chunk_border': boolean
     'action/free_camera': boolean
+    'action/navmesh_settings': {
+      cell_size: number
+      cell_height: number
+      walkable_slope_angle: number
+      walkable_radius: number
+      walkable_climb: number
+      walkable_height: number
+      min_region_area: number
+    }
+    'action/show_navmesh': boolean
   } & Packets
 
   type Events = import('aresrpg-protocol/src/types').TypedEmitter<
@@ -75,6 +85,7 @@ declare namespace Type {
       CHANGE_CHUNK: { x: number; z: number } // change the current chunk
       SET_TIME: number // set the time of the day
       TIME_CHANGE: number // the time of the day has changed
+      CLEAR_CHUNKS: void // clear all chunks
     } & Packets
   >
 

@@ -72,7 +72,7 @@ export default function () {
             ...state,
             settings: {
               ...state.settings,
-              view_distance: Math.max(2, Math.min(20, payload)),
+              view_distance: Math.max(3, Math.min(20, payload)),
             },
           }
         case 'action/far_view_distance':
@@ -80,7 +80,7 @@ export default function () {
             ...state,
             settings: {
               ...state.settings,
-              far_view_distance: Math.max(2, Math.min(50, payload)),
+              far_view_distance: Math.max(3, Math.min(50, payload)),
             },
           }
         case 'action/biome_settings':
@@ -105,6 +105,22 @@ export default function () {
             settings: {
               ...state.settings,
               free_camera: payload,
+            },
+          }
+        case 'action/show_navmesh':
+          return {
+            ...state,
+            settings: {
+              ...state.settings,
+              show_navmesh: payload,
+            },
+          }
+        case 'action/navmesh_settings':
+          return {
+            ...state,
+            world: {
+              ...state.world,
+              navmesh: payload,
             },
           }
       }

@@ -11,7 +11,7 @@ export function create_fractionnal_brownian(biome, seed) {
   const noise_pass_2 = createNoise2D(alea(`${seed}_2`))
   const noise_pass_3 = createNoise2D(alea(`${seed}_3`))
   return (x, y) => {
-    const key = `${x}:${y}`
+    const key = `${x}:${y}:${JSON.stringify(biome)}:${seed}`
 
     if (memoized.has(key)) return memoized.get(key)
 

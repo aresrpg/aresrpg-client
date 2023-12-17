@@ -107,9 +107,12 @@ export const INITIAL_STATE = {
     show_entities: true,
     show_terrain_collider: false,
     show_entities_collider: false,
+    show_navmesh: false,
 
-    view_distance: 10,
-    far_view_distance: 35,
+    // view_distance: 10,
+    // far_view_distance: 35,
+    view_distance: 3,
+    far_view_distance: 5,
     show_chunk_border: false,
 
     free_camera: false,
@@ -131,6 +134,15 @@ export const INITIAL_STATE = {
   world: {
     seed: 'aresrpg',
     biome: { ...Biomes.DEFAULT },
+    navmesh: {
+      cell_size: 0.2,
+      cell_height: 0.2,
+      walkable_slope_angle: 45,
+      walkable_radius: 0.5,
+      walkable_climb: 2,
+      walkable_height: 2,
+      min_region_area: 12,
+    },
   },
 
   /** @type {Type.Entity} */
@@ -251,6 +263,12 @@ async function create_context({ send_packet, connect_ws }) {
     world,
     /** @type {AbortSignal} */
     signal: new AbortController().signal,
+    navigation: {
+      /** @type {import('recast-navigation').NavMesh} */
+      navmesh: null,
+      /** @type {import('recast-navigation').NavMeshQuery} */
+      navmesh_query: null,
+    },
   }
 }
 

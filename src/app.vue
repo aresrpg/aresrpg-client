@@ -1,8 +1,6 @@
 <template lang="pug">
-Suspense(v-if="show_game")
+Suspense()
   Game
-.blank(v-else)
-  h1 Nothing to see here 👀
 </template>
 
 <script setup>
@@ -15,20 +13,12 @@ import {
   reactive,
   watchEffect,
 } from 'vue';
-import konamiCode from '@sidp/konami-code';
 import { VsLoadingFn } from 'vuesax-alpha';
 
-import konami_1 from './assets/konami_1.wav';
-import konami_2 from './assets/konami_2.wav';
-import konami_3 from './assets/konami_3.wav';
-import konami_ok from './assets/konami_ok.wav';
 import Game from './game.vue';
-import { VITE_KONAMI, VITE_API } from './env.js';
+import { VITE_API } from './env.js';
 
 const name = 'app';
-const show_game = ref(!VITE_KONAMI);
-const konami_sounds = [konami_1, konami_2, konami_3];
-const allowed_keys = [37, 38, 39, 40, 66, 65];
 const loading = ref(0);
 
 const auth_user = reactive({});
@@ -63,26 +53,6 @@ function request(query, variables = {}) {
   });
 }
 
-const play_konami_sound = event => {
-  if (!allowed_keys.includes(event?.keyCode)) return;
-  const random_index = Math.floor(Math.random() * konami_sounds.length);
-  const random_sound = konami_sounds[random_index];
-  new Audio(random_sound).play();
-};
-
-const play_konami_ok = () => {
-  new Audio(konami_ok).play();
-};
-
-if (VITE_KONAMI) {
-  konamiCode(function () {
-    show_game.value = true;
-    play_konami_ok();
-    window.removeEventListener('keydown', play_konami_sound);
-    this.remove();
-  });
-}
-
 function on_assets_loaded() {
   loading.value--;
 }
@@ -91,8 +61,6 @@ function on_assets_loading() {
 }
 
 onMounted(() => {
-  if (VITE_KONAMI) window.addEventListener('keydown', play_konami_sound);
-
   loading.value++;
   request(`{ me { uuid } }`)
     .then(res => res.json())

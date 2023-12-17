@@ -11,6 +11,7 @@ import { DAY_DURATION } from './game_nature'
 export default function () {
   const settings = { ...INITIAL_STATE.settings }
   const biome_settings = { ...INITIAL_STATE.world.biome }
+  const navmesh_settings = { ...INITIAL_STATE.world.navmesh }
 
   return {
     name: 'ui_settings',
@@ -25,6 +26,7 @@ export default function () {
       const terrain_folder = gui.addFolder('Terrain Settings')
       const entity_folder = gui.addFolder('Entity Settings')
       const world_gen_folder = gui.addFolder('World Gen Settings')
+      const navmesh_folder = gui.addFolder('Navmesh Settings')
       const camera_folder = gui.addFolder('Camera Settings')
 
       const handle_change = name => value => dispatch(name, value)
@@ -32,6 +34,13 @@ export default function () {
         const { biome } = get_state().world
         dispatch('action/biome_settings', {
           ...biome,
+          [property]: value,
+        })
+      }
+      const handle_navmesh_change = property => value => {
+        const { navmesh } = get_state().world
+        dispatch('action/navmesh_settings', {
+          ...navmesh,
           [property]: value,
         })
       }
@@ -97,6 +106,13 @@ export default function () {
         .name('Show Chunk Border')
         .onFinishChange(handle_change('action/show_chunk_border'))
 
+      terrain_folder
+        .add(
+          { clear_chunks: () => events.emit('CLEAR_CHUNKS') },
+          'clear_chunks',
+        )
+        .name('Clear Chunks')
+
       entity_folder
         .add(settings, 'show_entities')
         .name('Show Entities')
@@ -142,11 +158,52 @@ export default function () {
         .name('Free Camera')
         .onFinishChange(handle_change('action/free_camera'))
 
+      navmesh_folder
+        .add(settings, 'show_navmesh')
+        .name('Show Navmesh')
+        .onFinishChange(handle_change('action/show_navmesh'))
+
+      navmesh_folder
+        .add(navmesh_settings, 'cell_size', 0.1, 5, 0.1)
+        .name('Cell Size')
+        .onFinishChange(handle_navmesh_change('cell_size'))
+
+      navmesh_folder
+        .add(navmesh_settings, 'cell_height', 0.1, 5, 0.1)
+        .name('Cell Height')
+        .onFinishChange(handle_navmesh_change('cell_height'))
+
+      navmesh_folder
+        .add(navmesh_settings, 'walkable_slope_angle', 0, 90, 1)
+        .name('Walkable Slope Angle')
+        .onFinishChange(handle_navmesh_change('walkable_slope_angle'))
+
+      navmesh_folder
+        .add(navmesh_settings, 'walkable_radius', 0, 10, 0.1)
+        .name('Walkable Radius')
+        .onFinishChange(handle_navmesh_change('walkable_radius'))
+
+      navmesh_folder
+        .add(navmesh_settings, 'walkable_climb', 0, 10, 0.1)
+        .name('Walkable Climb')
+        .onFinishChange(handle_navmesh_change('walkable_climb'))
+
+      navmesh_folder
+        .add(navmesh_settings, 'walkable_height', 0, 10, 0.1)
+        .name('Walkable Height')
+        .onFinishChange(handle_navmesh_change('walkable_height'))
+
+      navmesh_folder
+        .add(navmesh_settings, 'min_region_area', 0, 100, 1)
+        .name('Min Region Area')
+        .onFinishChange(handle_navmesh_change('min_region_area'))
+
       gui.show()
       game_folder.open()
       terrain_folder.open()
       // entity_folder.open()
-      // world_gen_folder.open()
+      world_gen_folder.open()
+      navmesh_folder.open()
       camera_folder.open()
     },
   }

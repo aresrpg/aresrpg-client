@@ -210,6 +210,7 @@ export async function request_chunk_load({
     terrain: mesh,
     collider: collider_mesh,
     dispose() {
+      mesh.dispose()
       mesh.geometry.dispose()
       mesh.material.dispose()
       collider_mesh.geometry.dispose()
