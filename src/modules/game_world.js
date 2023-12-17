@@ -12,8 +12,9 @@ import {
   to_chunk_position,
   spiral_array,
   square_array,
+  CHUNK_SIZE,
 } from 'aresrpg-protocol/src/chunk.js'
-import { aiter } from 'iterator-helper'
+import { aiter, iter } from 'iterator-helper'
 
 import pandala from '../assets/pandala.wav'
 import { PLAYER_ID } from '../game.js'
@@ -24,6 +25,7 @@ import {
   request_low_detail_chunk_load,
 } from '../utils/chunks'
 import { abortable } from '../utils/iterator'
+import { create_navmesh } from '../utils/navmesh'
 
 const make_chunk_key = ({ x, z }) => `${x}:${z}`
 const from_chunk_key = key => {
@@ -179,16 +181,21 @@ export default function () {
       get_state,
       world,
       camera_controls,
+      navigation,
     }) {
       function reset_chunks() {
         loaded_chunks.forEach(
-          ({ terrain, enable_collisions, collider, dispose, chunk_border }) => {
+          (
+            { terrain, enable_collisions, collider, dispose, chunk_border },
+            key,
+          ) => {
             scene.remove(terrain)
             scene.remove(collider)
             scene.remove(chunk_border)
 
             dispose()
-            enable_collisions(false)
+
+            // enable_collisions(false)
           },
         )
         loaded_chunks.clear()
@@ -243,13 +250,56 @@ export default function () {
         if (entity) entity.target_position = new Vector3(x, y, z)
       })
 
+      events.on('CLEAR_CHUNKS', () => {
+        reset_chunks()
+      })
+
+      let navmesh_visualizer = null
+
+      function update_navmesh() {
+        const { navmesh: navmesh_settings } = get_state().world
+        const colliders = iter(loaded_chunks.values()).map(
+          ({ collider }) => collider,
+        )
+
+        return create_navmesh(colliders, navmesh_settings)
+      }
+
       aiter(abortable(on(events, 'STATE_UPDATED', { signal }))).reduce(
         (
-          { last_world, last_view_distance, last_far_view_distance },
-          { world, player, settings: { view_distance, far_view_distance } },
+          {
+            last_biome,
+            last_seed,
+            last_view_distance,
+            last_far_view_distance,
+            last_show_navmesh,
+            last_navmesh_settings,
+          },
+          {
+            world: { biome, seed, navmesh: navmesh_settings },
+            player,
+            settings: { view_distance, far_view_distance, show_navmesh },
+          },
         ) => {
           if (
-            last_world !== world ||
+            show_navmesh !== last_show_navmesh ||
+            navmesh_settings !== last_navmesh_settings
+          ) {
+            if (navigation.navmesh) {
+              navigation.navmesh.destroy()
+              navigation.navmesh_query.destroy()
+              scene.remove(navmesh_visualizer)
+            }
+            const { navmesh, navmesh_helper, navmesh_query } = update_navmesh()
+            navmesh_visualizer = navmesh_helper
+            navigation.navmesh = navmesh
+            navigation.navmesh_query = navmesh_query
+            if (show_navmesh) scene.add(navmesh_visualizer)
+          }
+
+          if (
+            last_biome !== biome ||
+            last_seed !== seed ||
             last_view_distance !== view_distance ||
             last_far_view_distance !== far_view_distance
           ) {
@@ -261,9 +311,12 @@ export default function () {
             }
           }
           return {
-            last_world: world,
+            last_biome: biome,
+            last_seed: seed,
             last_view_distance: view_distance,
             last_far_view_distance: far_view_distance,
+            last_show_navmesh: show_navmesh,
+            last_navmesh_settings: navmesh_settings,
           }
         },
       )
@@ -292,21 +345,19 @@ export default function () {
             await Promise.all(
               chunks_to_load.map(async key => {
                 const { x, z } = from_chunk_key(key)
-                const loaded_chunk = await request_chunk_load({
-                  chunk_x: x,
-                  chunk_z: z,
-                  world,
-                  biome,
-                  seed,
-                })
-
                 const {
                   terrain,
                   enable_collisions,
                   collider,
                   dispose,
                   chunk_border,
-                } = loaded_chunk
+                } = await request_chunk_load({
+                  chunk_x: x,
+                  chunk_z: z,
+                  world,
+                  biome,
+                  seed,
+                })
 
                 loaded_chunks.set(key, {
                   terrain,
@@ -327,14 +378,22 @@ export default function () {
             // Add new terrain and remove old terrain from the scene
             loaded_chunks.forEach(
               (
-                { terrain, collider, dispose, enable_collisions, chunk_border },
+                {
+                  terrain,
+                  collider,
+                  dispose,
+                  enable_collisions,
+                  chunk_border,
+                  vertices,
+                  indices,
+                },
                 key,
               ) => {
                 if (chunks_with_collisions.includes(key)) {
-                  enable_collisions(true)
+                  // enable_collisions(true)
                   scene.add(collider)
                 } else {
-                  enable_collisions(false)
+                  // enable_collisions(false)
                   scene.remove(collider)
                 }
 

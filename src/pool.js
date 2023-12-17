@@ -215,7 +215,7 @@ export default function create_pools({ scene, world }) {
           collider,
           move(position) {
             rigid_body.setNextKinematicTranslation(position)
-            body.position.copy(position)
+            body.position.copy(position).add(new Vector3(0, height / 2, 0))
           },
           remove() {
             body.visible = false
