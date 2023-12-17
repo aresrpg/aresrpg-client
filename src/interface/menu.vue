@@ -216,7 +216,7 @@ a
         position absolute
         width 100%
         height 100%
-        background url('src/assets/iop_bg.png') center / cover
+        background url('../assets/iop_bg.png') center / cover
         filter grayscale(50%)
         z-index -1
       .grad
