@@ -27,7 +27,7 @@ import {
 import merge from 'fast-merge-async-iterators'
 import { aiter } from 'iterator-helper'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { World } from '@dimforge/rapier3d'
+import { EventQueue, World } from '@dimforge/rapier3d'
 import CameraControls from 'camera-controls'
 import { init as init_recast_navigation } from 'recast-navigation'
 
@@ -51,6 +51,7 @@ import game_world from './modules/game_world.js'
 import create_pools from './pool.js'
 import game_nature from './modules/game_nature.js'
 import Biomes from './world_gen/biomes.js'
+import world_portal from './modules/world_portal.js'
 
 export const GRAVITY = 9.81
 export const PLAYER_ID = 'player'
@@ -109,8 +110,8 @@ export const INITIAL_STATE = {
     show_entities_collider: false,
     show_navmesh: false,
 
-    view_distance: 10,
-    far_view_distance: 35,
+    view_distance: 3,
+    far_view_distance: 0,
     show_chunk_border: false,
 
     free_camera: false,
@@ -187,7 +188,7 @@ const PERMANENT_MODULES = [
 
 const GAME_MODULES = {
   MENU: [main_menu],
-  GAME: [ui_settings, player_movement, game_camera, game_world],
+  GAME: [ui_settings, player_movement, game_camera, game_world, world_portal],
 }
 
 function last_event_value(emitter, event, default_value = null) {
@@ -210,8 +211,8 @@ async function create_context({ send_packet, connect_ws }) {
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setClearColor(0x263238 / 2, 1)
   renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = VSMShadowMap
-  renderer.outputColorSpace = SRGBColorSpace
+  renderer.physicallyCorrectLights = true
+  // renderer.shadowMap.type = VSMShadowMap
   renderer.toneMapping = ACESFilmicToneMapping
 
   const composer = new EffectComposer(renderer)
@@ -221,13 +222,13 @@ async function create_context({ send_packet, connect_ws }) {
     60, // Field of view
     window.innerWidth / window.innerHeight, // Aspect ratio
     0.1, // Near clipping plane
-    2000, // Far clipping plane
+    1500, // Far clipping plane
   )
+
+  const collision_queue = new EventQueue(true)
 
   const Pool = await create_pools({ scene, world, camera })
   const orthographic_camera = new OrthographicCamera()
-
-  camera.far = 2000
 
   /** @type {Type.Events} */
   // @ts-ignore
@@ -240,6 +241,7 @@ async function create_context({ send_packet, connect_ws }) {
     actions,
     Pool,
     composer,
+    collision_queue,
     camera_controls: new CameraControls(camera, renderer.domElement),
     /** @type {import("aresrpg-protocol/src/types").create_client['send']} */
     send_packet,
@@ -287,6 +289,7 @@ export default async function create_game({
     camera,
     dispatch,
     composer,
+    collision_queue,
   } = context
 
   const permanent_modules = PERMANENT_MODULES.map(create => create({ world }))
@@ -357,7 +360,7 @@ export default async function create_game({
         const state = get_state()
         const delta_seconds = game_delta / 1000
 
-        if (state.game_state === 'GAME') world.step()
+        if (state.game_state === 'GAME') world.step(collision_queue)
 
         permanent_modules
           .map(({ tick }) => tick)

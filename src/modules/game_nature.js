@@ -194,10 +194,10 @@ export default function () {
           moonlight.target.position.copy(light_target_position)
 
           const normalized_phi = phi / Math.PI
-          const intensity = Math.cos(normalized_phi * Math.PI) * 0.5 + 0.5
+          const intensity = Math.cos(normalized_phi * Math.PI) * 0.5 + 0.6
 
           sunlight.intensity = Math.max(0, intensity)
-          ambiant_light.intensity = Math.max(0.2, intensity)
+          ambiant_light.intensity = Math.max(0.5, intensity)
           moonlight.intensity = is_night ? 1 : 0 // Adjust intensity based on night/day
 
           if (!is_night) {

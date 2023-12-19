@@ -2,7 +2,18 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader'
-import { Box3, DefaultLoadingManager, Vector3 } from 'three'
+import {
+  Box3,
+  DefaultLoadingManager,
+  DoubleSide,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  Vector3,
+} from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils'
+import { StaticGeometryGenerator } from 'three-mesh-bvh'
+import { ColliderDesc } from '@dimforge/rapier3d'
 
 export const MODEL_SCALE = 0.01
 
@@ -21,7 +32,6 @@ GLTF_LOADER.setDRACOLoader(DRACO_LOADER)
 /** @type {(string) => Promise<import('three/examples/jsm/loaders/GLTFLoader').GLTF['scene']>} */
 export async function load_gltf(path) {
   const { scene } = await GLTF_LOADER.loadAsync(path)
-  // scene.scale.setScalar(0.1)
 
   return scene
 }
