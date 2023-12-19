@@ -63,10 +63,13 @@ export default function () {
       game_folder
         .add(
           {
-            teleport: () =>
+            teleport: () => {
+              const { player } = get_state()
+              const { x, z } = player.position()
               dispatch('packet/playerPosition', {
-                position: { x: 0, y: 300, z: 0 },
-              }),
+                position: { x, y: 150, z },
+              })
+            },
           },
           'teleport',
         )

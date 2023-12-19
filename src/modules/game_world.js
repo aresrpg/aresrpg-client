@@ -361,6 +361,7 @@ export default function () {
               settings,
               world: { seed, biome },
             } = get_state()
+
             const chunks_with_collisions = square_array(current_chunk, 2).map(
               make_chunk_key,
             )
@@ -403,9 +404,9 @@ export default function () {
 
             if (!settings.free_camera)
               // Update camera_controls.colliderMeshes to match chunks_with_collisions
-              camera_controls.colliderMeshes = chunks_with_collisions.map(
-                key => loaded_chunks.get(key).collider,
-              )
+              camera_controls.colliderMeshes = chunks_with_collisions
+                .filter(key => loaded_chunks.has(key))
+                .map(key => loaded_chunks.get(key).collider)
 
             // Add new terrain and remove old terrain from the scene
             loaded_chunks.forEach(
@@ -438,6 +439,8 @@ export default function () {
             )
           } catch (error) {
             console.error(error)
+          } finally {
+            events.emit('CHUNKS_LOADED')
           }
         },
       )
@@ -445,6 +448,7 @@ export default function () {
       // handle low details chunks
       aiter(abortable(on(events, 'CHANGE_CHUNK', { signal }))).forEach(
         async current_chunk => {
+          console.log('CHANGE_CHUNK', current_chunk)
           try {
             const {
               settings,
@@ -488,8 +492,6 @@ export default function () {
             scene.add(low_detail_plane)
           } catch (error) {
             console.error(error)
-          } finally {
-            events.emit('CHUNKS_LOADED')
           }
         },
       )
