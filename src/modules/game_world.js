@@ -6,9 +6,13 @@ import {
   AudioLoader,
   BackSide,
   Color,
+  DoubleSide,
+  FrontSide,
   Mesh,
   MeshBasicMaterial,
   MeshPhongMaterial,
+  MeshStandardMaterial,
+  MeshToonMaterial,
   Quaternion,
   Vector3,
 } from 'three'
@@ -31,6 +35,7 @@ import {
 } from '../utils/chunks'
 import { abortable } from '../utils/iterator'
 import { create_navmesh } from '../utils/navmesh'
+import { create_fractionnal_brownian } from '../world_gen/noise'
 
 const make_chunk_key = ({ x, z }) => `${x}:${z}`
 export const from_chunk_key = key => {
@@ -45,19 +50,34 @@ const audio_loader = new AudioLoader()
 const MOVE_UPDATE_INTERVAL = 0.1
 const MAX_TITLE_VIEW_DISTANCE = CHUNK_SIZE * 1.3
 
-const audio_buffer = await audio_loader.loadAsync(main_theme)
+const audio_buffer = audio_loader.loadAsync(main_theme)
 
-sound.setBuffer(audio_buffer)
-sound.setLoop(true)
-sound.setVolume(0.5)
+/** @typedef {{ terrain: import("three").Mesh, collider: import("three").Mesh }} chunk */
 
 /** @type {Type.Module} */
-export default function () {
-  /** @typedef {{ terrain: import("three").Mesh, collider: import("three").Mesh, enable_collisions: (x: boolean) => void}} chunk */
+export default function (shared) {
   /** @type {Map<string, chunk>} chunk position to chunk */
   const loaded_chunks = new Map()
   let low_detail_plane = null
   const entities = new Map()
+  const static_objects = []
+  const sensors = new Map()
+
+  Object.assign(shared, {
+    get_chunk_collider: chunk_position => {
+      return loaded_chunks.get(make_chunk_key(chunk_position))?.collider
+    },
+    static_objects,
+    add_sensor: ({ sensor, on_collide }) => {
+      const key = make_chunk_key(to_chunk_position(sensor.position))
+      if (!sensors.has(key)) sensors.set(key, new Set())
+      sensors.get(key).add({ sensor, on_collide })
+    },
+    get_sensors: chunk_position => {
+      const key = make_chunk_key(chunk_position)
+      return iter(sensors.get(key)?.values() || []).toArray()
+    },
+  })
 
   return {
     name: 'game_world',
@@ -78,13 +98,14 @@ export default function () {
     ) {
       // handle entities movement
       for (const entity of entities.values()) {
-        if (entity.is_jumping == null) entity.is_jumping = 0
-        entity.is_jumping = Math.max(0, entity.is_jumping - delta)
+        if (entity.jump_time == null) entity.jump_time = 0
+        entity.jump_time = Math.max(0, entity.jump_time - delta)
 
         if (entity.target_position) {
+          const old_position = entity.position.clone()
           const lerp_factor = Math.min(delta / MOVE_UPDATE_INTERVAL, 1)
           const new_position = new Vector3().lerpVectors(
-            entity.position(),
+            entity.position,
             entity.target_position,
             lerp_factor,
           )
@@ -97,7 +118,9 @@ export default function () {
           )
 
           entity.rotate(movement)
-          entity.is_dancing = false
+
+          if (old_position.distanceTo(entity.target_position) > 0.5)
+            entity.action = null
 
           const is_moving_horizontally = movement.setY(0).lengthSq() > 0.001
 
@@ -106,20 +129,18 @@ export default function () {
 
           entity.animate(
             compute_animation_state({
-              is_jumping: entity.is_jumping,
-              is_on_ground: !entity.is_jumping,
+              is_on_ground: entity.action !== 'JUMP',
               is_moving_horizontally,
-              is_dancing: false,
+              action: entity.action,
             }),
             delta,
           )
         } else
           entity.animate(
             compute_animation_state({
-              is_jumping: entity.is_jumping,
-              is_on_ground: !entity.is_jumping,
+              is_on_ground: entity.action !== 'JUMP',
               is_moving_horizontally: false,
-              is_dancing: entity.is_dancing,
+              action: entity.action,
             }),
             delta,
           )
@@ -172,6 +193,10 @@ export default function () {
           world: {
             ...state.world,
             seed: payload.seed,
+            heightfield: create_fractionnal_brownian(
+              state.world.biome,
+              payload.seed,
+            ),
           },
         }
       }
@@ -189,19 +214,16 @@ export default function () {
       camera_controls,
       navigation,
     }) {
+      let first_chunks_loaded = false
+
       function reset_chunks() {
         loaded_chunks.forEach(
-          (
-            { terrain, enable_collisions, collider, dispose, chunk_border },
-            key,
-          ) => {
+          ({ terrain, collider, dispose, chunk_border }, key) => {
             scene.remove(terrain)
             scene.remove(collider)
             scene.remove(chunk_border)
 
             dispose()
-
-            enable_collisions(false)
           },
         )
         loaded_chunks.clear()
@@ -217,8 +239,19 @@ export default function () {
       }
 
       events.once('STATE_UPDATED', ({ selected_character_id, characters }) => {
-        sound.play()
-        const player = Pool.guard.get({
+        audio_buffer.then(buffer => {
+          sound.setBuffer(buffer)
+          sound.setLoop(true)
+          sound.setVolume(0.5)
+          sound.play()
+        })
+
+        const audio_interval = setInterval(() => {
+          sound.context.resume()
+          if (sound.context.state === 'running') clearInterval(audio_interval)
+        }, 500)
+
+        const player = Pool.iop_male.get({
           add_rigid_body: true,
           fixed_title_aspect: true,
         })
@@ -246,7 +279,7 @@ export default function () {
         if (entities.has(id)) return
 
         if (type === 'PLAYER') {
-          const entity = Pool.guard.get()
+          const entity = Pool.iop_male.get()
           entity.id = id
           entity.title.text = name
           entity.move(position)
@@ -269,7 +302,7 @@ export default function () {
         if (entity) {
           entity.target_position = new Vector3(x, y, z)
           if (state.player) {
-            const position = state.player.position()
+            const { position } = state.player
             const distance = position.distanceTo(new Vector3(x, y, z))
             if (distance > MAX_TITLE_VIEW_DISTANCE && entity.title.visible)
               entity.title.visible = false
@@ -337,8 +370,8 @@ export default function () {
           ) {
             reset_chunks()
 
-            if (player) {
-              const chunk_position = to_chunk_position(player.position())
+            if (player && first_chunks_loaded) {
+              const chunk_position = to_chunk_position(player.position)
               events.emit('CHANGE_CHUNK', chunk_position)
             }
           }
@@ -362,9 +395,10 @@ export default function () {
               world: { seed, biome },
             } = get_state()
 
-            const chunks_with_collisions = square_array(current_chunk, 2).map(
-              make_chunk_key,
-            )
+            const chunks_with_camera_collisions = square_array(
+              current_chunk,
+              2,
+            ).map(make_chunk_key)
             const new_chunks = spiral_array(
               current_chunk,
               0,
@@ -378,23 +412,18 @@ export default function () {
             await Promise.all(
               chunks_to_load.map(async key => {
                 const { x, z } = from_chunk_key(key)
-                const {
-                  terrain,
-                  enable_collisions,
-                  collider,
-                  dispose,
-                  chunk_border,
-                } = await request_chunk_load({
-                  chunk_x: x,
-                  chunk_z: z,
-                  world,
-                  biome,
-                  seed,
-                })
+                const { terrain, collider, dispose, chunk_border } =
+                  await request_chunk_load({
+                    chunk_x: x,
+                    chunk_z: z,
+                    world,
+                    biome,
+                    seed,
+                    objects: static_objects,
+                  })
 
                 loaded_chunks.set(key, {
                   terrain,
-                  enable_collisions,
                   collider,
                   dispose,
                   chunk_border,
@@ -404,23 +433,15 @@ export default function () {
 
             if (!settings.free_camera)
               // Update camera_controls.colliderMeshes to match chunks_with_collisions
-              camera_controls.colliderMeshes = chunks_with_collisions
+              camera_controls.colliderMeshes = chunks_with_camera_collisions
                 .filter(key => loaded_chunks.has(key))
                 .map(key => loaded_chunks.get(key).collider)
 
             // Add new terrain and remove old terrain from the scene
             loaded_chunks.forEach(
-              (
-                { terrain, collider, dispose, enable_collisions, chunk_border },
-                key,
-              ) => {
-                if (chunks_with_collisions.includes(key)) {
-                  enable_collisions(true)
-                  scene.add(collider)
-                } else {
-                  enable_collisions(false)
-                  scene.remove(collider)
-                }
+              ({ terrain, collider, dispose, chunk_border }, key) => {
+                if (key === make_chunk_key(current_chunk)) scene.add(collider)
+                else scene.remove(collider)
 
                 if (new_chunks.includes(key)) {
                   // Add terrain to the scene if not already present
@@ -440,6 +461,7 @@ export default function () {
           } catch (error) {
             console.error(error)
           } finally {
+            first_chunks_loaded = true
             events.emit('CHUNKS_LOADED')
           }
         },
@@ -448,7 +470,6 @@ export default function () {
       // handle low details chunks
       aiter(abortable(on(events, 'CHANGE_CHUNK', { signal }))).forEach(
         async current_chunk => {
-          console.log('CHANGE_CHUNK', current_chunk)
           try {
             const {
               settings,
@@ -481,11 +502,7 @@ export default function () {
               low_detail_plane_geometry,
               new MeshPhongMaterial({
                 vertexColors: true,
-                color: new Color(0.4, 0.4, 0.4), // Darken the base color
-                emissive: new Color(0, 0, 0), // No additional light from the material itself
-                specular: new Color(0, 0, 0), // Low specular highlights
-                shininess: 10, // Adjust shininess for the size of the specular highlight
-                side: BackSide,
+                side: FrontSide,
               }),
             )
 
@@ -503,17 +520,10 @@ export default function () {
 
       events.on('packet/entityAction', ({ id, action }) => {
         const entity = entities.get(id)
+
         if (entity) {
-          switch (action) {
-            case 'JUMP':
-              entity.is_jumping = 0.5
-              break
-            case 'DANCE':
-              entity.is_dancing = true
-              break
-            default:
-              break
-          }
+          if (action === 'JUMP') entity.jump_time = 0.5
+          entity.action = action
         }
       })
 

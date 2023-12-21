@@ -18,9 +18,10 @@ import { to_chunk_position } from 'aresrpg-protocol'
 import { GRAVITY } from '../game.js'
 import { abortable } from '../utils/iterator'
 import { compute_animation_state } from '../utils/animation.js'
+import { compute_movements, compute_sensors } from '../utils/physics.js'
 
-const SPEED = 7
-const JUMP_FORCE = 12
+const SPEED = 6
+const JUMP_FORCE = 10
 const CONTROLLER_OFFSET = 0.01
 const ASCENT_GRAVITY_FACTOR = 3
 const APEX_GRAVITY_FACTOR = 0.3
@@ -72,16 +73,16 @@ function compute_and_play_animation({
     return animations.JUMP
   } else if (
     (jump_state === jump_states.APEX || jump_state === jump_states.DESCENT) &&
-    current_animation !== animations.FALLING
+    current_animation !== animations.FALL
   ) {
-    fade_to_animation(current_animation, animations.FALLING, 0.3)
-    return animations.FALLING
+    fade_to_animation(current_animation, animations.FALL, 0.3)
+    return animations.FALL
   } else if (
-    current_animation !== animations.FALLING &&
+    current_animation !== animations.FALL &&
     current_animation !== animations.JUMP
   ) {
-    fade_to_animation(current_animation, animations.FALLING, 0.5)
-    return animations.FALLING
+    fade_to_animation(current_animation, animations.FALL, 0.5)
+    return animations.FALL
   }
 
   if (on_ground && inputs.dance && current_animation !== animations.DANCE) {
@@ -91,20 +92,9 @@ function compute_and_play_animation({
 }
 
 /** @type {Type.Module} */
-export default function ({ world }) {
+export default function (shared) {
   const velocity = new Vector3()
-  const controller = world.createCharacterController(CONTROLLER_OFFSET)
   const model_forward = new Vector3(0, 0, 1)
-
-  // Don’t allow climbing slopes larger than 45 degrees.
-  controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180)
-  // Automatically slide down on slopes smaller than 30 degrees.
-  controller.setMinSlopeSlideAngle((30 * Math.PI) / 180)
-
-  controller.enableAutostep(1.1, 0.3, false)
-  controller.enableSnapToGround(1)
-  // controller.setCharacterMass(100)
-  // controller.setSlideEnabled(true)
 
   let jump_state = jump_states.NONE
   let jump_cooldown = 0
@@ -117,14 +107,18 @@ export default function ({ world }) {
 
   return {
     name: 'player_movements',
-    tick({ inputs, player }, { camera, send_packet, events }, delta) {
+    tick(
+      { inputs, player, world: { heightfield } },
+      { camera, send_packet, events },
+      delta,
+    ) {
       if (!player) return
 
-      const {
-        animations,
-        rapier_body: { collider, rigid_body },
-      } = player
-      const position = player.position()
+      const { animations } = player
+      const { position } = player
+
+      const origin = position.clone()
+
       const camera_forward = new Vector3(0, 0, -1)
         .applyQuaternion(camera.quaternion)
         .setY(0)
@@ -143,11 +137,16 @@ export default function ({ world }) {
         return
       }
 
+      // we don't want to go futher if no chunks are loaded
+      // this check must be after the target_position check
+      if (!chunks_loaded) return
+
       // Avoid falling to hell
       // TODO: tp to nether if falling to hell
       if (position.y <= -30) {
         velocity.setScalar(0)
-        player.move(new Vector3(position.x, 100, position.z))
+        const { x, z } = position
+        player.move(new Vector3(position.x, heightfield(x, z) + 5, position.z))
         return
       }
 
@@ -213,16 +212,34 @@ export default function ({ world }) {
         case jump_states.NONE:
         default:
           // if not jumping, apply normal gravity as long as chunks are there
-          if (chunks_loaded) velocity.y -= GRAVITY * delta
+          if (on_ground) velocity.y = -GRAVITY * delta
+          else velocity.y -= GRAVITY * delta
       }
 
       movement.addScaledVector(velocity, delta)
 
-      controller.computeColliderMovement(collider, movement)
-      on_ground = controller.computedGrounded()
+      player.move(position.clone().add(movement))
 
-      const { x, y, z } = controller.computedMovement()
-      const corrected_movement = new Vector3(x, y, z)
+      player.three_body.updateMatrixWorld()
+
+      const terrain = shared.get_chunk_collider(
+        to_chunk_position(position.clone().add(movement).floor()),
+      )
+
+      if (!terrain) return
+
+      on_ground = compute_movements({
+        player,
+        terrain,
+        character: {
+          capsule_radius: player.radius,
+          capsule_segment: player.segment,
+          matrix_world: player.three_body.matrixWorld,
+        },
+        delta,
+        velocity,
+        objects: shared.static_objects,
+      })
 
       const is_moving_horizontally =
         inputs.forward || inputs.backward || inputs.right || inputs.left
@@ -238,30 +255,34 @@ export default function ({ world }) {
       }
 
       const animation_name = compute_animation_state({
-        is_jumping: jump_state === jump_states.ASCENT,
         is_on_ground: on_ground,
         is_moving_horizontally,
-        is_dancing: inputs.dance,
+        action:
+          jump_state === jump_states.ASCENT
+            ? 'JUMP'
+            : inputs.dance
+              ? 'DANCE'
+              : null,
       })
-
-      const new_position = new Vector3(
-        position.x + corrected_movement.x,
-        position.y + corrected_movement.y,
-        position.z + corrected_movement.z,
-      )
 
       if (is_moving_horizontally || !on_ground)
         player.animate(animation_name, delta)
       else player.animate(inputs.dance ? 'DANCE' : 'IDLE', delta)
 
-      if (new_position.distanceToSquared(position) > 0.001)
-        player.move(new_position)
-
-      const last_chunk = to_chunk_position(position)
-      const current_chunk = to_chunk_position(new_position)
+      const last_chunk = to_chunk_position(origin)
+      const current_chunk = to_chunk_position(player.position)
 
       if (last_chunk.x !== current_chunk.x || last_chunk.z !== current_chunk.z)
         events.emit('CHANGE_CHUNK', current_chunk)
+
+      compute_sensors({
+        player,
+        character: {
+          capsule_radius: player.radius,
+          capsule_segment: player.segment,
+        },
+        sensors: shared.get_sensors(current_chunk),
+      })
     },
     reduce(state, { type, payload }) {
       if (type === 'packet/playerPosition') {
@@ -275,14 +296,14 @@ export default function ({ world }) {
       }
       return state
     },
-    observe({ events, world, signal, dispatch, get_state, send_packet }) {
+    observe({ events, signal, dispatch, get_state, send_packet }) {
       aiter(abortable(setInterval(50, null, { signal }))).reduce(
         last_position => {
           const { player } = get_state()
 
           if (!player) return last_position
 
-          const position = player.position()
+          const { position } = player
           const { x, y, z } = position
 
           if (
@@ -293,7 +314,7 @@ export default function ({ world }) {
             send_packet('packet/playerPosition', { position })
           }
 
-          return position
+          return { x, y, z }
         },
         new Vector3(),
       )

@@ -64,10 +64,18 @@ export default function () {
         .add(
           {
             teleport: () => {
-              const { player } = get_state()
-              const { x, z } = player.position()
+              const {
+                player,
+                world: { heightfield },
+              } = get_state()
+              const { x, z } = player.position
+              console.log(x, z, heightfield(x, z))
               dispatch('packet/playerPosition', {
-                position: { x, y: 150, z },
+                position: {
+                  x,
+                  y: heightfield(x, z) + 5,
+                  z,
+                },
               })
             },
           },
@@ -204,7 +212,7 @@ export default function () {
       gui.show()
       game_folder.open()
       terrain_folder.open()
-      // entity_folder.open()
+      entity_folder.open()
       world_gen_folder.open()
       navmesh_folder.open()
       camera_folder.open()

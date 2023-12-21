@@ -12,7 +12,6 @@ import {
   Vector3,
 } from 'three'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { RigidBodyDesc, ColliderDesc } from '@dimforge/rapier3d'
 import { Text } from 'troika-three-text'
 import { createDerivedMaterial } from 'troika-three-utils'
 
@@ -22,17 +21,8 @@ import step3 from './assets/sound/step3.ogg'
 import step4 from './assets/sound/step4.ogg'
 import step5 from './assets/sound/step5.ogg'
 import step6 from './assets/sound/step6.ogg'
-import {
-  MODEL_SCALE,
-  load_fbx_animation,
-  load_fbx_model,
-} from './utils/load_model.js'
-import guard_fbx from './models/guard.fbx?url'
-import guard_idle_fbx from './animations/guard_idle.fbx?url'
-import guard_run_fbx from './animations/guard_run.fbx?url'
-import guard_dance_fbx from './animations/guard_dance.fbx?url'
-import guard_jump_fbx from './animations/guard_jump.fbx?url'
-import guard_falling_fbx from './animations/guard_falling.fbx?url'
+import { load } from './utils/load_model.js'
+import iop_male from './models/iop.glb?url'
 
 const throttle = (action, interval) => {
   let last_time = 0
@@ -101,27 +91,28 @@ const play_step_sound = throttle(() => {
 }, 310)
 
 const Models = {
-  guard: {
-    model: await load_fbx_model(guard_fbx),
-    IDLE: await load_fbx_animation(guard_idle_fbx),
-    RUN: await load_fbx_animation(guard_run_fbx),
-    DANCE: await load_fbx_animation(guard_dance_fbx),
-    JUMP: await load_fbx_animation(guard_jump_fbx),
-    FALLING: await load_fbx_animation(guard_falling_fbx),
-  },
-}
-
-function get_model_size(model, scale = MODEL_SCALE) {
-  const bbox = new Box3().setFromObject(model)
-  const size = bbox.getSize(new Vector3())
-
-  const height = size.y / scale / 2
-  const radius = size.z + size.x / scale / 2 / 2
-
-  return {
-    height,
-    radius,
-  }
+  iop_male: await load(iop_male, {
+    scale: 0.45,
+    animations_names: Array.from({
+      length: 16,
+      0: 'AFK',
+      1: 'ATTACK_1',
+      2: 'ATTACK_2',
+      3: 'ATTACK_3',
+      4: 'DANCE',
+      5: 'DEATH',
+      6: 'ROLL',
+      7: 'FALL',
+      8: 'HIT',
+      9: 'ATTACK_HEAVY',
+      10: 'ATTACK_HEAVY_HOLD',
+      11: 'IDLE',
+      12: 'JUMP',
+      13: 'LAND',
+      14: 'RUN',
+    }),
+    envMapIntensity: 0.5,
+  }),
 }
 
 function fade_to_animation(from, to, duration = 0.3) {
@@ -135,16 +126,17 @@ function fade_to_animation(from, to, duration = 0.3) {
  *
  * @param {object} param0
  * @param {import("three").Scene} param0.scene
- * @param {import("@dimforge/rapier3d").World} param0.world
  */
-export default function create_pools({ scene, world }) {
-  function create_pool({ model, ...animations }, { count, transform }) {
-    const { height, radius } = get_model_size(model)
+export default function create_pools({ scene, shared }) {
+  function create_pool(
+    { model, compute_animations },
+    { count, scale = 1, height, radius },
+  ) {
     const data = Array.from({ length: count }).map(() => {
       const cloned_body = clone(model)
       const body = new Object3D()
 
-      const collider_geometry = new BoxGeometry(radius, height * 1.3, radius)
+      const collider_geometry = new CapsuleGeometry(radius, height / 2, 2)
       const collider_mesh = new Mesh(
         collider_geometry,
         new MeshBasicMaterial({
@@ -159,8 +151,9 @@ export default function create_pools({ scene, world }) {
       cloned_body.name = 'model'
       collider_mesh.name = 'collider'
 
-      cloned_body.position.y -= height * 0.9
-      // collider.position.y -= height / 2
+      cloned_body.position.y -= height * 0.86
+      cloned_body.rotation.y = Math.PI
+      collider_mesh.position.y -= height * 0.3
 
       body.add(cloned_body)
       body.add(collider_mesh)
@@ -186,20 +179,13 @@ export default function create_pools({ scene, world }) {
 
         if (!body) throw new Error('No more models available')
 
-        const mixer = new AnimationMixer(body.getObjectByName('model'))
-
         body.visible = true
 
-        const clips = {
-          ...Object.fromEntries(
-            Object.entries(animations).map(([key, clip]) => [
-              key,
-              mixer.clipAction(clip),
-            ]),
-          ),
-        }
+        const animations = compute_animations(body.model)
 
-        let current_animation = clips.IDLE
+        if (animations.JUMP) animations.JUMP.setLoop(LoopOnce, 1)
+
+        let current_animation = animations.IDLE
 
         current_animation.reset().play()
 
@@ -216,17 +202,25 @@ export default function create_pools({ scene, world }) {
 
         scene.add(title)
 
-        const base_entity = {
+        shared.outline.selectedObjects.push(body)
+
+        return {
           title,
           three_body: body,
           height,
           radius,
+          segment: new Line3(new Vector3(), new Vector3(0, -height / 2, 0)),
           move(position) {
             body.position.copy(position)
-            title.position.copy(position).add(new Vector3(0, height * 1.4, 0))
+            title.position.copy(position).add(new Vector3(0, height / 2, 0))
           },
           remove() {
             scene.remove(title)
+
+            shared.outline.selectedObjects.splice(
+              shared.outline.selectedObjects.indexOf(body),
+              1,
+            )
 
             title.geometry.dispose()
 
@@ -243,63 +237,30 @@ export default function create_pools({ scene, world }) {
             body.quaternion.slerp(quaternion, 0.2)
           },
           animate(clip, delta) {
-            mixer.update(delta)
+            animations.mixer.update(delta)
 
             if (clip === 'RUN') play_step_sound()
-            if (clip === 'IDLE' && current_animation === clips.DANCE) return
+            if (clip === 'IDLE' && current_animation === animations.DANCE)
+              return
 
-            const animation = clips[clip]
+            const animation = animations[clip]
             if (animation && animation !== current_animation) {
               fade_to_animation(current_animation, animation)
               current_animation = animation
             }
           },
-          position() {
-            return body.position.clone()
-          },
+          position: body.position,
           target_position: null,
-        }
-
-        if (!add_rigid_body) return base_entity
-
-        const rigid_body_descriptor = RigidBodyDesc.kinematicPositionBased()
-        const collider_descriptor = ColliderDesc.cuboid(
-          radius,
-          height * 0.9,
-          radius,
-        )
-        const rigid_body = world.createRigidBody(rigid_body_descriptor)
-        const collider = world.createCollider(collider_descriptor, rigid_body)
-
-        return {
-          ...base_entity,
-          rapier_body: { rigid_body, collider },
-          collider,
-          move(position) {
-            rigid_body.setNextKinematicTranslation(position)
-            base_entity.move(position)
-          },
-          remove() {
-            world.removeCollider(collider, false)
-            world.removeRigidBody(rigid_body)
-            base_entity.remove()
-          },
-          position() {
-            const { x, y, z } = rigid_body.translation()
-            return new Vector3(x, y, z)
-          },
         }
       },
     }
   }
 
   return {
-    guard: create_pool(Models.guard, {
+    iop_male: create_pool(Models.iop_male, {
       count: 10,
-      transform: ({ JUMP, ...model }) => {
-        JUMP.setLoop(LoopOnce, 0)
-        return { ...model, JUMP }
-      },
+      height: 1.9,
+      radius: 0.7,
     }),
   }
 }

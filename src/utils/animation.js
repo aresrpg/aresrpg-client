@@ -1,12 +1,11 @@
 export function compute_animation_state({
-  is_jumping,
   is_on_ground,
   is_moving_horizontally,
-  is_dancing,
+  action,
 }) {
-  if (is_jumping) return 'JUMP'
-  if (!is_on_ground) return 'FALLING'
+  if (action === 'JUMP') return action
+  if (!is_on_ground) return 'FALL'
   if (is_moving_horizontally) return 'RUN'
-  if (is_dancing) return 'DANCE'
+  if (action) return action
   return 'IDLE'
 }

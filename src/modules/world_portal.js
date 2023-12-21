@@ -1,15 +1,11 @@
 import { on } from 'events'
 
 import { aiter } from 'iterator-helper'
+import { MeshBVH, StaticGeometryGenerator } from 'three-mesh-bvh'
 import {
-  ActiveCollisionTypes,
-  ActiveEvents,
-  ColliderDesc,
-  RigidBodyDesc,
-} from '@dimforge/rapier3d'
-import { StaticGeometryGenerator } from 'three-mesh-bvh'
-import {
+  AmbientLight,
   CameraHelper,
+  DirectionalLight,
   DoubleSide,
   Group,
   Mesh,
@@ -27,18 +23,17 @@ import { frameCorners } from 'three/examples/jsm/utils/CameraUtils.js'
 import { abortable } from '../utils/iterator.js'
 import portal_model from '../models/empty_portal.gltf?url'
 import tictacworld_model from '../models/tiktakworld.gltf?url'
-import { load_gltf } from '../utils/load_model'
-import { create_fractionnal_brownian } from '../world_gen/noise'
+import { load } from '../utils/load_model'
 import dispose from '../utils/dispose.js'
 
-const loaded_portal = await load_gltf(portal_model)
-const tictacworld = await load_gltf(tictacworld_model)
-
-loaded_portal.scale.setScalar(1.3)
-tictacworld.scale.setScalar(0.7)
+const loaded_portal = await load(portal_model, {
+  scale: 1.3,
+  envMapIntensity: 0.1,
+})
+const tictacworld = await load(tictacworld_model, { scale: 0.5 })
 
 function find_flat_surface({
-  noise,
+  heightfield,
   start_x,
   start_z,
   width,
@@ -48,16 +43,17 @@ function find_flat_surface({
   for (let radius = 1; radius <= max_search_radius; radius++)
     for (let x = start_x - radius; x <= start_x + radius; x++)
       for (let z = start_z - radius; z <= start_z + radius; z++)
-        if (is_flat_surface({ noise, x, z, width, depth })) return { x, z }
+        if (is_flat_surface({ heightfield, x, z, width, depth }))
+          return { x, z }
   return {}
 }
 
-function is_flat_surface({ x, z, noise, width, depth }) {
-  let min_height = noise(x, z)
+function is_flat_surface({ x, z, heightfield, width, depth }) {
+  let min_height = heightfield(x, z)
   let max_height = min_height
   for (let offset_x = 0; offset_x < width; offset_x++)
     for (let offset_z = 0; offset_z < depth; offset_z++) {
-      const height = noise(x + offset_x, z + offset_z)
+      const height = heightfield(x + offset_x, z + offset_z)
       min_height = Math.min(min_height, height)
       max_height = Math.max(max_height, height)
 
@@ -69,22 +65,21 @@ function is_flat_surface({ x, z, noise, width, depth }) {
 
 function create_collider(
   object,
-  world,
   position,
-  metalness = 0,
-  roughness = 1,
+  rotation = Math.PI * 0.4,
+  child_material = {},
 ) {
   const model = clone(object)
 
   model.position.set(position.x, position.y + 1.8, position.z)
-  model.rotation.y = Math.PI * 0.4
+
+  if (rotation) model.rotation.y = rotation
+
   model.updateMatrixWorld(true)
 
   model.traverse(child => {
     if (child.isMesh) {
-      child.material.metalness = metalness
-      child.material.roughness = roughness
-
+      Object.assign(child.material, child_material)
       child.castShadow = true
       child.receiveShadow = true
     }
@@ -94,30 +89,23 @@ function create_collider(
   model.receiveShadow = true
 
   const static_geometry = new StaticGeometryGenerator(model).generate()
+  static_geometry.boundsTree = new MeshBVH(static_geometry)
 
-  const vertices = static_geometry.attributes.position.array
-  const indices = static_geometry.index.array
-
-  const collider_desc = ColliderDesc.trimesh(vertices, indices)
-  const collider = world.createCollider(collider_desc)
-
-  const body = RigidBodyDesc.fixed()
-  const rigid_body = world.createRigidBody(body, collider)
+  const collider = new Mesh(static_geometry)
 
   return {
     model,
+    collider,
     remove() {
-      world.removeCollider(collider)
-      world.removeRigidBody(rigid_body)
-      dispose(group)
+      dispose(model)
+      collider.geometry.dispose()
+      collider.material.dispose()
     },
   }
 }
 
 /** @type {Type.Module} */
-export default function () {
-  const portal = {}
-
+export default function (shared) {
   const PORTAL_DEFINITION = 1024
   const PORTAL_SIZE = 30
 
@@ -127,7 +115,7 @@ export default function () {
   const topLeftCorner = new Vector3()
   const reflectedPosition = new Vector3()
 
-  const portalCamera = new PerspectiveCamera(60, 1.0, 0.1, 500.0)
+  const portalCamera = new PerspectiveCamera(30, 1.0, 0.1, 500.0)
 
   const leftPortalTexture = new WebGLRenderTarget(
     PORTAL_DEFINITION,
@@ -226,27 +214,16 @@ export default function () {
         scene,
       )
 
-      collision_queue.drainCollisionEvents((handle1, handle2, started) => {
-        console.log('collision', handle1, handle2, started)
-      })
-
       // restore the original rendering properties
       renderer.shadowMap.autoUpdate = currentShadowAutoUpdate
       renderer.setRenderTarget(currentRenderTarget)
     },
-    observe({ events, signal, scene, world, renderer, collision_queue }) {
+    observe({ events, signal, scene, renderer, camera_controls }) {
       aiter(abortable(on(events, 'STATE_UPDATED', { signal }))).reduce(
-        (last_seed, { world: { seed, biome } }) => {
+        (last_seed, { world: { seed, biome, heightfield } }) => {
           if (last_seed !== seed) {
-            if (portal.model) {
-              scene.remove(portal.model)
-              portal.remove()
-            }
-
-            const noise = create_fractionnal_brownian(biome, seed)
-
             const { x, z } = find_flat_surface({
-              noise,
+              heightfield,
               start_x: -400,
               start_z: 100,
               width: 6,
@@ -254,62 +231,98 @@ export default function () {
               max_search_radius: 1000,
             })
 
-            const coords = new Vector3(x, noise(x, z), z)
+            const portal1_position = new Vector3(-245, 19, 115)
 
-            const { model, remove } = create_collider(
-              loaded_portal,
-              world,
-              coords,
-              1,
-              0.5,
+            const portal1 = create_collider(
+              loaded_portal.model,
+              portal1_position,
             )
 
-            Object.assign(portal, { model, remove })
-            scene.add(model)
+            scene.add(portal1.model)
 
-            leftPortal.position.x = coords.x + 0.02
-            leftPortal.position.y = coords.y + 3.5
-            leftPortal.position.z = coords.z
+            leftPortal.position.x = portal1_position.x + 0.02
+            leftPortal.position.y = portal1_position.y + 3.5
+            leftPortal.position.z = portal1_position.z
 
             leftPortal.scale.set(0.1, 0.16, 0.1)
 
             leftPortal.rotation.y = Math.PI * 0.13
 
-            const leftPortalColliderDesc = ColliderDesc.cuboid(2, 2, 1)
-              .setTranslation(
-                leftPortal.position.x,
-                leftPortal.position.y,
-                leftPortal.position.z,
-              )
-              .setSensor(true)
+            leftPortal.geometry.boundsTree = new MeshBVH(leftPortal.geometry)
 
-            const left_sensor = world.createCollider(leftPortalColliderDesc)
-            left_sensor.setSensor(true)
+            shared.static_objects.push(portal1.collider)
 
-            world.intersectionsWith(left_sensor, otherCollider => {
-              console.log('intersection', otherCollider)
-              // This closure is called on each collider potentially
-              // intersecting the collider `collider`.
+            const portal2_position = new Vector3(-288, 2003, 98)
+
+            shared.add_sensor({
+              sensor: leftPortal,
+              on_collide: player => {
+                const position = new Vector3(-287, 2004, 98)
+                camera_controls.setLookAt(
+                  -292,
+                  2004,
+                  98,
+                  position.x,
+                  position.y,
+                  position.z,
+                )
+                player.move(position)
+              },
             })
 
             scene.add(leftPortal)
 
-            rightPortal.position.x = -560
-            rightPortal.position.y = 2007
-            rightPortal.position.z = 80
-            rightPortal.scale.set(0.35, 0.35, 0.35)
+            const portal2 = create_collider(
+              loaded_portal.model,
+              {
+                x: portal2_position.x,
+                y: portal2_position.y - 2,
+                z: portal2_position.z,
+              },
+              Math.PI * 0.65,
+            )
+
+            rightPortal.position.x = portal2_position.x
+            rightPortal.position.y = portal2_position.y + 1.5
+            rightPortal.position.z = portal2_position.z
+
+            rightPortal.scale.set(0.1, 0.16, 0.1)
 
             rightPortal.rotation.y = Math.PI * 0.4
 
+            rightPortal.geometry.boundsTree = new MeshBVH(rightPortal.geometry)
+
+            scene.add(portal2.model)
             scene.add(rightPortal)
 
+            shared.static_objects.push(portal2.collider)
+
+            shared.add_sensor({
+              sensor: rightPortal,
+              on_collide: player => {
+                const position = new Vector3(-243, 22, 119)
+                camera_controls.setLookAt(
+                  portal1_position.x,
+                  portal1_position.y,
+                  portal1_position.z,
+                  position.x,
+                  position.y,
+                  position.z,
+                )
+                player.move(position)
+              },
+            })
+
             const tictac = create_collider(
-              tictacworld,
-              world,
-              new Vector3(-500, 2000, 100),
+              tictacworld.model,
+              portal1_position.clone().setY(2000),
+              Math.PI * 0.4,
+              { metalness: 0, roughness: 1, envMapIntensity: 0.6 },
             )
 
             scene.add(tictac.model)
+
+            shared.static_objects.push(tictac.collider)
           }
           return seed
         },

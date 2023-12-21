@@ -20,10 +20,10 @@ import {
   Vector3,
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { RigidBodyDesc, ColliderDesc } from '@dimforge/rapier3d'
 import workerpool from 'workerpool'
 import { CHUNK_SIZE } from 'aresrpg-protocol'
 import { WORLD_HEIGHT } from 'aresrpg-protocol/src/chunk.js'
+import { MeshBVH, StaticGeometryGenerator } from 'three-mesh-bvh'
 
 import Biomes from '../world_gen/biomes.js'
 import greedy_mesh from '../world_gen/greedy_mesh.js'
@@ -109,12 +109,10 @@ export async function request_low_detail_chunks_load({ chunks, seed, biome }) {
  * @param {Object} Options
  * @param {number} Options.chunk_x
  * @param {number} Options.chunk_z
- * @param {import("@dimforge/rapier3d").World} Options.world
  */
 export async function request_chunk_load({
   chunk_x,
   chunk_z,
-  world,
   seed,
   biome = Biomes.DEFAULT,
 }) {
@@ -130,6 +128,7 @@ export async function request_chunk_load({
   const voxel_geometry = new BoxGeometry(1, 1, 1)
   const material = new MeshPhongMaterial({
     side: FrontSide,
+    specular: 0x404040,
   })
   const mesh = new InstancedMesh(voxel_geometry, material, volumes.length)
 
@@ -140,6 +139,8 @@ export async function request_chunk_load({
   // Array to store mesh data for collision
   const collision_vertices = []
   const collision_indices = []
+
+  const meshes = []
 
   // Process greedy volumes for rendering and collision
   volumes.forEach((volume, index) => {
@@ -172,32 +173,12 @@ export async function request_chunk_load({
     )
 
     volume_geometry.translate(chunk_x * CHUNK_SIZE, 0, chunk_z * CHUNK_SIZE)
-
-    // Merge this volume geometry into a single geometry for collision
-    if (index === 0) {
-      collision_vertices.push(...volume_geometry.attributes.position.array)
-      collision_indices.push(...volume_geometry.index.array)
-    } else {
-      const offset = collision_vertices.length / 3
-      collision_vertices.push(...volume_geometry.attributes.position.array)
-      collision_indices.push(
-        ...volume_geometry.index.array.map(idx => idx + offset),
-      )
-    }
-
-    // Dispose of the temporary volume geometry
-    volume_geometry.dispose()
+    meshes.push(new Mesh(volume_geometry))
   })
 
   mesh.instanceMatrix.needsUpdate = true
 
-  // Create the collider mesh using the combined collision data
-  const collision_geometry = new BufferGeometry()
-  collision_geometry.setAttribute(
-    'position',
-    new Float32BufferAttribute(collision_vertices, 3),
-  )
-  collision_geometry.setIndex(collision_indices)
+  const collision_geometry = new StaticGeometryGenerator(meshes).generate()
 
   const collider_mesh = new Mesh(
     collision_geometry,
@@ -208,14 +189,12 @@ export async function request_chunk_load({
     }),
   )
 
-  const vertices = new Float32Array(collision_vertices)
-  const indices = new Uint32Array(collision_indices)
+  meshes.forEach(mesh => {
+    mesh.geometry.dispose()
+    mesh.material.dispose()
+  })
 
-  const body_descriptor = RigidBodyDesc.fixed()
-  const collider_descriptor = ColliderDesc.trimesh(vertices, indices)
-
-  let rigid_body = null
-  let collider = null
+  collision_geometry.boundsTree = new MeshBVH(collision_geometry)
 
   const chunk_border = new Mesh(
     new BoxGeometry(CHUNK_SIZE, WORLD_HEIGHT, CHUNK_SIZE),
@@ -245,18 +224,6 @@ export async function request_chunk_load({
       collider_mesh.material.dispose()
       chunk_border.geometry.dispose()
       chunk_border.material.dispose()
-    },
-    enable_collisions(enable) {
-      if (enable) {
-        if (!rigid_body) rigid_body = world.createRigidBody(body_descriptor)
-        if (!collider)
-          collider = world.createCollider(collider_descriptor, rigid_body)
-      } else {
-        if (collider) world.removeCollider(collider, false)
-        if (rigid_body) world.removeRigidBody(rigid_body)
-        rigid_body = null
-        collider = null
-      }
     },
   }
 }

@@ -8,6 +8,7 @@
     .ws
       .title socket
       .status(:class="{ online: ws_status === 'OPEN', connecting: ws_status === 'CONNECTING', offline: ws_status === 'CLOSED' }")
+    .server players {{ server_info.online }}/{{ server_info.max }}
   //- .top_right
   .bottom_panel
     .chat
@@ -22,7 +23,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, inject, computed, ref } from 'vue';
+import { onMounted, onUnmounted, inject, computed, ref, reactive } from 'vue';
 import { to_chunk_position } from 'aresrpg-protocol';
 
 import pkg from '../../package.json';
@@ -31,11 +32,16 @@ const ws_status = inject('ws_status');
 const state = inject('state');
 const game = inject('game');
 const escape_menu_open = ref(false);
+const server_info = reactive({
+  online: 0,
+  max: 0,
+});
 
 const position = computed(() => {
-  if (!state.value.player) return [0, 0, 0];
-  const { position } = state.value.player;
-  const { x, y, z } = position();
+  if (!state.value.player?.position) return [0, 0, 0];
+  const {
+    position: { x, y, z },
+  } = state.value.player;
   return [Math.round(x), Math.round(y), Math.round(z)];
 });
 
@@ -56,14 +62,21 @@ function on_menu_quit_btn() {
   game.value.dispatch('action/load_game_state', 'MENU');
 }
 
+function update_server_info({ online, max }) {
+  server_info.online = online;
+  server_info.max = max;
+}
+
 function on_menu_controls_btn() {}
 
 onMounted(() => {
   window.addEventListener('keydown', on_escape);
+  game.value.events.on('packet/serverInfo', update_server_info);
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', on_escape);
+  game.value.events.off('packet/serverInfo', update_server_info);
 });
 </script>
 
@@ -109,6 +122,9 @@ onUnmounted(() => {
         &.offline
           background crimson
           box-shadow 0 0 5px crimson
+    .server
+      font-size .8em
+      color #EEEEEE
   .top_right
     width 300px
     height 200px
