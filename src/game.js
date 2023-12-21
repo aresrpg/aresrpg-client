@@ -27,7 +27,6 @@ import {
 import merge from 'fast-merge-async-iterators'
 import { aiter } from 'iterator-helper'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { EventQueue, World } from '@dimforge/rapier3d'
 import CameraControls from 'camera-controls'
 import { init as init_recast_navigation } from 'recast-navigation'
 
@@ -85,14 +84,14 @@ LOADING_MANAGER.onLoad = () => {
 /** @typedef {(state: State, action: Type.Action) => State} Reducer */
 /** @typedef {(context: Context) => void} Observer */
 /** @typedef {(state: State, context: Context, delta: number) => void} Ticker */
-/** @typedef {(module_params: {world?: World, modules?: any}) => { name: string, reduce?: Reducer, observe?: Observer, tick?: Ticker }} Module */
+/** @typedef {(shared: Context['shared']) => { name: string, reduce?: Reducer, observe?: Observer, tick?: Ticker }} Module */
 /** @typedef {import("three").AnimationAction} AnimAction */
 
 export const INITIAL_STATE = {
   /** @type {Type.GameState} */
   game_state: 'MENU',
   settings: {
-    target_fps: 120,
+    target_fps: 60,
     game_speed: 1,
     mouse_sensitivity: 0.005,
     show_fps: true,
@@ -111,7 +110,7 @@ export const INITIAL_STATE = {
     show_navmesh: false,
 
     view_distance: 3,
-    far_view_distance: 0,
+    far_view_distance: 5,
     show_chunk_border: false,
 
     free_camera: false,
@@ -133,6 +132,8 @@ export const INITIAL_STATE = {
   world: {
     seed: 'aresrpg',
     biome: { ...Biomes.DEFAULT },
+    /** @type {(chunk_position: {x: number, z: number}) => number} */
+    heightfield: null,
     navmesh: {
       cell_size: 0.2,
       cell_height: 0.2,
@@ -201,7 +202,6 @@ function last_event_value(emitter, event, default_value = null) {
 
 async function create_context({ send_packet, connect_ws }) {
   const scene = new Scene()
-  const world = new World(new Vector3(0, -GRAVITY, 0))
   scene.background = new Color('#E0E0E0')
   scene.fog = new Fog('#E0E0E0', 0, 1500)
 
@@ -212,8 +212,10 @@ async function create_context({ send_packet, connect_ws }) {
   renderer.setClearColor(0x263238 / 2, 1)
   renderer.shadowMap.enabled = true
   renderer.physicallyCorrectLights = true
+  renderer.outputEncoding = SRGBColorSpace
   // renderer.shadowMap.type = VSMShadowMap
   renderer.toneMapping = ACESFilmicToneMapping
+  renderer.toneMappingExposure = Math.pow(0.9, 5.0)
 
   const composer = new EffectComposer(renderer)
   composer.setSize(window.innerWidth, window.innerHeight)
@@ -225,9 +227,9 @@ async function create_context({ send_packet, connect_ws }) {
     1500, // Far clipping plane
   )
 
-  const collision_queue = new EventQueue(true)
+  const shared = {}
 
-  const Pool = await create_pools({ scene, world, camera })
+  const Pool = create_pools({ scene, camera, shared })
   const orthographic_camera = new OrthographicCamera()
 
   /** @type {Type.Events} */
@@ -241,7 +243,7 @@ async function create_context({ send_packet, connect_ws }) {
     actions,
     Pool,
     composer,
-    collision_queue,
+    shared,
     camera_controls: new CameraControls(camera, renderer.domElement),
     /** @type {import("aresrpg-protocol/src/types").create_client['send']} */
     send_packet,
@@ -259,7 +261,6 @@ async function create_context({ send_packet, connect_ws }) {
     renderer,
     orthographic_camera,
     camera,
-    world,
     /** @type {AbortSignal} */
     signal: new AbortController().signal,
     navigation: {
@@ -282,7 +283,6 @@ export default async function create_game({
   })
   const {
     events,
-    world,
     scene,
     renderer,
     get_state,
@@ -290,13 +290,14 @@ export default async function create_game({
     dispatch,
     composer,
     collision_queue,
+    shared,
   } = context
 
-  const permanent_modules = PERMANENT_MODULES.map(create => create({ world }))
+  const permanent_modules = PERMANENT_MODULES.map(create => create(shared))
   const game_modules = Object.fromEntries(
     Object.entries(GAME_MODULES).map(([key, modules]) => [
       key,
-      modules.map(create => create({ world })),
+      modules.map(create => create(shared)),
     ]),
   )
   const modules_loader = create_modules_loader({ modules: game_modules })
@@ -350,17 +351,19 @@ export default async function create_game({
     let last_frame_time = performance.now()
     let { game_speed } = INITIAL_STATE.settings
 
+    document.addEventListener('visibilitychange', event => {
+      if (!document.hidden) last_frame_time = performance.now()
+    })
+
     return function animate(current_time) {
       requestAnimationFrame(animate)
 
       const real_delta = current_time - last_frame_time
       const game_delta = real_delta * game_speed // Slow-motion effect on game logic
 
-      if (real_delta >= frame_duration) {
+      if (real_delta >= frame_duration && real_delta < 500) {
         const state = get_state()
         const delta_seconds = game_delta / 1000
-
-        if (state.game_state === 'GAME') world.step(collision_queue)
 
         permanent_modules
           .map(({ tick }) => tick)

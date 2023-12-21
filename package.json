@@ -16,7 +16,6 @@
     "@bufbuild/buf": "^1.28.1",
     "@bufbuild/protobuf": "^1.5.1",
     "@bufbuild/protoc-gen-es": "^1.5.1",
-    "@dimforge/rapier3d": "^0.11.2",
     "@fortawesome/fontawesome-svg-core": "^6.5.1",
     "@fortawesome/free-brands-svg-icons": "^6.5.1",
     "@fortawesome/free-regular-svg-icons": "^6.5.1",

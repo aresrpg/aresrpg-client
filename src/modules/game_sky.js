@@ -19,7 +19,7 @@ import { DAY_DURATION } from './game_nature.js'
 export default function () {
   return {
     name: 'game_sky',
-    observe({ scene, events, world, signal }) {
+    observe({ scene, events, signal }) {
       // Load day skybox texture
       const day_skybox = new CubeTextureLoader().load([
         day_px,

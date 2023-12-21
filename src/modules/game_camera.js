@@ -38,7 +38,9 @@ export default function () {
       if (!player) return
 
       if (!free_camera) {
-        const { x, y, z } = player.position()
+        const {
+          position: { x, y, z },
+        } = player
 
         camera_controls.moveTo(x, y, z, true)
         camera_controls.setTarget(x, y, z, true)

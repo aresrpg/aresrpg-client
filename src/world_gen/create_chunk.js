@@ -1,8 +1,8 @@
 import ndarray from 'ndarray'
 import { CHUNK_SIZE, WORLD_HEIGHT } from 'aresrpg-protocol'
 
-import { create_fractionnal_brownian } from './noise.js'
 import greedy_mesh from './greedy_mesh.js'
+import { create_fractionnal_brownian } from './noise.js'
 
 const VOXEL_SIZE = 1
 
@@ -216,9 +216,10 @@ export function create_low_detail_chunk_column(
       const c = a + 1
       const d = b + 1
 
-      // Create two triangles (quad) for each grid square
-      indices.push(a, b, c)
-      indices.push(b, d, c)
+      // Create two triangles (quad) for each grid square with the correct winding order
+      // The winding order is counter-clockwise when looking from above, assuming y is up
+      indices.push(a, c, b) // First triangle
+      indices.push(c, d, b) // Second triangle
     }
   }
 

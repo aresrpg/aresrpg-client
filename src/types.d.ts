@@ -26,10 +26,6 @@ declare namespace Type {
     id: string
     title: import('troika-three-text').Text
     three_body: import('three').Object3D
-    rapier_body: {
-      rigid_body: import('@dimforge/rapier3d').RigidBody
-      collider: import('@dimforge/rapier3d').Collider
-    }
     height: number
     radius: number
     position: () => import('three').Vector3

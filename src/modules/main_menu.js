@@ -36,12 +36,12 @@ export default function () {
         if (sound.context.state === 'running') clearInterval(audio_interval)
       }, 500)
 
-      entity = Pool.guard.get()
+      entity = Pool.iop_male.get()
 
       scene.add(grass)
 
-      entity.move(new Vector3(0.5, 1.2, 5.3))
-      entity.three_body.rotation.y = -0.8
+      entity.move(new Vector3(0.5, 1.9, 5))
+      entity.three_body.rotation.y = Math.PI * 1.75
       // @ts-ignore
       entity.three_body.collider.visible = false
 
