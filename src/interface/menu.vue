@@ -13,7 +13,7 @@
     img.logo(:src="text_logo")
     .btns
       .ares_btn(v-if="!is_logged" @click="open_app" ) Login
-      .ares_btn(v-else @click="play" :class="{ disabled: play_button_disabled}") Play
+      .ares_btn.green(v-else @click="play" :class="{ disabled: play_button_disabled}") Play
       .sub
         .discord.ares_btn(@click="open_discord") Discord
         .twitter.ares_btn(@click="open_twitter") Twitter
@@ -156,6 +156,10 @@ onUnmounted(() => {
 </script>
 
 <style lang="stylus" scoped>
+.ares_btn.green
+  background #2ECC71
+  &:hover
+    background #27ae60
 a
   text-decoration none
   &:hover

@@ -3,14 +3,8 @@ import { on } from 'events'
 import { aiter } from 'iterator-helper'
 import { MeshBVH, StaticGeometryGenerator } from 'three-mesh-bvh'
 import {
-  AmbientLight,
-  CameraHelper,
-  DirectionalLight,
-  DoubleSide,
-  Group,
   Mesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   PerspectiveCamera,
   PlaneGeometry,
   Vector3,

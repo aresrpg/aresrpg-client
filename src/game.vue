@@ -60,13 +60,25 @@ const game = ref(
             loading.value--;
             if (event.reason) {
               disconnect_reason = event.reason;
-              if (event.reason === 'EARLY_ACCESS_KEY_REQUIRED')
-                toast.error(
-                  'You need an early access key to play on AresRPG',
-                  'Oh no!',
-                  `<i class='bx bx-key'/>`,
-                );
-              else toast.error(event.reason);
+              switch (event.reason) {
+                case 'ALREADY_ONLINE':
+                  disconnect_reason = null;
+                  toast.error(
+                    'It seems you are already connected to the server, please wait a few seconds and try again',
+                    'Oh no!',
+                    `<i class='bx bx-key'/>`,
+                  );
+                  break;
+                case 'EARLY_ACCESS_KEY_REQUIRED':
+                  toast.error(
+                    'You need an early access key to play on AresRPG',
+                    'Oh no!',
+                    `<i class='bx bx-key'/>`,
+                  );
+                  break;
+                default:
+                  toast.error(event.reason);
+              }
             }
             ares_client.value?.notify_end(event.reason);
             logger.SOCKET(`disconnected: ${event.reason}`);

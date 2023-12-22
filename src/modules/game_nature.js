@@ -55,7 +55,7 @@ export default function () {
     tick() {
       if (water) water.material.uniforms.time.value += 1.0 / 60.0
     },
-    observe({ scene, renderer, signal, camera, get_state, events }) {
+    observe({ scene, renderer, signal, get_state, events }) {
       // lights
       const ambiant_light = new AmbientLight(0xffffff, 1)
 
