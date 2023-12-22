@@ -109,8 +109,8 @@ export const INITIAL_STATE = {
     show_entities_collider: false,
     show_navmesh: false,
 
-    view_distance: 3,
-    far_view_distance: 5,
+    view_distance: 5,
+    far_view_distance: 10,
     show_chunk_border: false,
 
     free_camera: false,
@@ -130,7 +130,7 @@ export const INITIAL_STATE = {
   },
 
   world: {
-    seed: 'aresrpg',
+    seed: 'aresrpg_',
     biome: { ...Biomes.DEFAULT },
     /** @type {(x: number, z: number) => number} */
     heightfield: null,

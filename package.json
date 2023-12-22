@@ -13,7 +13,7 @@
     "postversion": "git push --follow-tags"
   },
   "dependencies": {
-    "@aresrpg/aresrpg-protocol": "^1.2.1",
+    "@aresrpg/aresrpg-protocol": "^1.2.2",
     "@bufbuild/buf": "^1.28.1",
     "@bufbuild/protobuf": "^1.6.0",
     "@bufbuild/protoc-gen-es": "^1.6.0",
