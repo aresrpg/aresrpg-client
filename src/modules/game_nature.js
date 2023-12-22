@@ -17,7 +17,7 @@ import {
 import { Water } from 'three/examples/jsm/objects/Water.js'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { aiter } from 'iterator-helper'
-import { CHUNK_SIZE, to_chunk_position } from 'aresrpg-protocol/src'
+import { CHUNK_SIZE, to_chunk_position } from '@aresrpg/aresrpg-protocol'
 
 import water_normal from '../assets/waternormals.jpg'
 import { abortable } from '../utils/iterator'

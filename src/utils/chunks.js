@@ -21,8 +21,8 @@ import {
 } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import workerpool from 'workerpool'
-import { CHUNK_SIZE } from 'aresrpg-protocol'
-import { WORLD_HEIGHT } from 'aresrpg-protocol/src/chunk.js'
+import { CHUNK_SIZE } from '@aresrpg/aresrpg-protocol'
+import { WORLD_HEIGHT } from '@aresrpg/aresrpg-protocol/src/chunk.js'
 import { MeshBVH, StaticGeometryGenerator } from 'three-mesh-bvh'
 
 import Biomes from '../world_gen/biomes.js'
@@ -105,18 +105,13 @@ export async function request_low_detail_chunks_load({ chunks, seed, biome }) {
   return geometry
 }
 
-/**
- * @param {Object} Options
- * @param {number} Options.chunk_x
- * @param {number} Options.chunk_z
- */
 export async function request_chunk_load({
   chunk_x,
   chunk_z,
   seed,
   biome = Biomes.DEFAULT,
 }) {
-  /** @type {{ x: number, y: number, z: number, data: Object }[]} */
+  /** @type {ReturnType<import("../world_gen/create_chunk.js")["create_chunk_column"]>} */
   const volumes = await pool.exec('create_chunk_column', [
     chunk_x,
     chunk_z,
@@ -213,7 +208,6 @@ export async function request_chunk_load({
 
   return {
     chunk_border,
-    voxel_count: volumes.length,
     terrain: mesh,
     collider: collider_mesh,
     dispose() {

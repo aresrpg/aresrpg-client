@@ -1,4 +1,4 @@
-import { CHUNK_SIZE, WORLD_HEIGHT } from 'aresrpg-protocol'
+import { CHUNK_SIZE, WORLD_HEIGHT } from '@aresrpg/aresrpg-protocol'
 import ndarray from 'ndarray'
 
 export default function greedy_mesh(chunk) {

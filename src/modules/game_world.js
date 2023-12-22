@@ -21,7 +21,7 @@ import {
   spiral_array,
   square_array,
   CHUNK_SIZE,
-} from 'aresrpg-protocol/src/chunk.js'
+} from '@aresrpg/aresrpg-protocol/src/chunk.js'
 import { aiter, iter } from 'iterator-helper'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
@@ -52,7 +52,7 @@ const MAX_TITLE_VIEW_DISTANCE = CHUNK_SIZE * 1.3
 
 const audio_buffer = audio_loader.loadAsync(main_theme)
 
-/** @typedef {{ terrain: import("three").Mesh, collider: import("three").Mesh }} chunk */
+/** @typedef {Type.Await<ReturnType<import("../utils/chunks")["request_chunk_load"]>>} chunk */
 
 /** @type {Type.Module} */
 export default function (shared) {
@@ -192,10 +192,10 @@ export default function (shared) {
           ...state,
           world: {
             ...state.world,
-            seed: payload.seed,
+            seed: payload,
             heightfield: create_fractionnal_brownian(
               state.world.biome,
-              payload.seed,
+              payload,
             ),
           },
         }
@@ -210,7 +210,6 @@ export default function (shared) {
       Pool,
       send_packet,
       get_state,
-      world,
       camera_controls,
       navigation,
     }) {
@@ -340,11 +339,13 @@ export default function (shared) {
             last_show_navmesh,
             last_navmesh_settings,
           },
-          {
-            world: { biome, seed, navmesh: navmesh_settings },
-            player,
-            settings: { view_distance, far_view_distance, show_navmesh },
-          },
+          [
+            {
+              world: { biome, seed, navmesh: navmesh_settings },
+              player,
+              settings: { view_distance, far_view_distance, show_navmesh },
+            },
+          ],
         ) => {
           if (
             show_navmesh !== last_show_navmesh ||
@@ -388,7 +389,7 @@ export default function (shared) {
 
       // handle voxels chunks
       aiter(abortable(on(events, 'CHANGE_CHUNK', { signal }))).forEach(
-        async current_chunk => {
+        async ([current_chunk]) => {
           try {
             const {
               settings,
@@ -416,10 +417,8 @@ export default function (shared) {
                   await request_chunk_load({
                     chunk_x: x,
                     chunk_z: z,
-                    world,
                     biome,
                     seed,
-                    objects: static_objects,
                   })
 
                 loaded_chunks.set(key, {

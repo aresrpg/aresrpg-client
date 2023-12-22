@@ -126,6 +126,7 @@ function fade_to_animation(from, to, duration = 0.3) {
  *
  * @param {object} param0
  * @param {import("three").Scene} param0.scene
+ * @param {object} param0.shared
  */
 export default function create_pools({ scene, shared }) {
   function create_pool(
@@ -173,14 +174,20 @@ export default function create_pools({ scene, shared }) {
 
     return {
       data,
-      /** @type {(options: { add_rigid_body: boolean }) => Type.Entity} */
-      get({ add_rigid_body, fixed_title_aspect } = {}) {
+      /** @type {(options?: { add_rigid_body: boolean, fixed_title_aspect: boolean }) => Type.Entity} */
+      get(
+        { add_rigid_body, fixed_title_aspect } = {
+          add_rigid_body: false,
+          fixed_title_aspect: false,
+        },
+      ) {
         const body = data.find(object => !object.visible)
 
         if (!body) throw new Error('No more models available')
 
         body.visible = true
 
+        // @ts-ignore
         const animations = compute_animations(body.model)
 
         if (animations.JUMP) animations.JUMP.setLoop(LoopOnce, 1)
@@ -205,12 +212,14 @@ export default function create_pools({ scene, shared }) {
         shared.outline.selectedObjects.push(body)
 
         return {
+          id: '',
           title,
           three_body: body,
           height,
           radius,
           segment: new Line3(new Vector3(), new Vector3(0, -height / 2, 0)),
           move(position) {
+            // @ts-ignore
             body.position.copy(position)
             title.position.copy(position).add(new Vector3(0, height / 2, 0))
           },

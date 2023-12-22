@@ -20,7 +20,7 @@ import {
 } from 'vue';
 import WebGL from 'three/addons/capabilities/WebGL.js';
 import { useWebSocket } from '@vueuse/core';
-import { create_client } from 'aresrpg-protocol';
+import { create_client } from '@aresrpg/aresrpg-protocol';
 
 import logger from './utils/logger.js';
 import Interface from './interface/ui.vue';

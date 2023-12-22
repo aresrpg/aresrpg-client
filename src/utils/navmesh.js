@@ -1,4 +1,4 @@
-import { CHUNK_SIZE } from 'aresrpg-protocol'
+import { CHUNK_SIZE } from '@aresrpg/aresrpg-protocol'
 import { NavMeshQuery } from 'recast-navigation'
 import { NavMeshHelper, threeToTiledNavMesh } from 'recast-navigation/three'
 

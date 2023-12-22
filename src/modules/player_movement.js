@@ -13,7 +13,7 @@ import {
   Vector3,
 } from 'three'
 import { lerp } from 'three/src/math/MathUtils.js'
-import { to_chunk_position } from 'aresrpg-protocol'
+import { to_chunk_position } from '@aresrpg/aresrpg-protocol'
 
 import { GRAVITY } from '../game.js'
 import { abortable } from '../utils/iterator'
@@ -36,73 +36,14 @@ const jump_states = {
   NONE: 'NONE',
 }
 
-function rounded_position(position) {
-  const factor = Math.pow(10, 5)
-  return new Vector3()
-    .copy(position)
-    .multiplyScalar(factor)
-    .round()
-    .divide(factor)
-}
-
-function compute_and_play_animation({
-  current_animation,
-  on_ground,
-  is_moving_horizontally,
-  inputs,
-  animations,
-  jump_state,
-}) {
-  if (on_ground) {
-    if (is_moving_horizontally && current_animation !== animations.RUN) {
-      fade_to_animation(current_animation, animations.RUN, 0.3)
-      return animations.RUN
-    } else if (
-      !is_moving_horizontally &&
-      current_animation !== animations.IDLE &&
-      current_animation !== animations.DANCE
-    ) {
-      fade_to_animation(current_animation, animations.IDLE, 0.3)
-      return animations.IDLE
-    }
-  } else if (
-    jump_state === jump_states.ASCENT &&
-    current_animation !== animations.JUMP
-  ) {
-    fade_to_animation(current_animation, animations.JUMP, 0)
-    return animations.JUMP
-  } else if (
-    (jump_state === jump_states.APEX || jump_state === jump_states.DESCENT) &&
-    current_animation !== animations.FALL
-  ) {
-    fade_to_animation(current_animation, animations.FALL, 0.3)
-    return animations.FALL
-  } else if (
-    current_animation !== animations.FALL &&
-    current_animation !== animations.JUMP
-  ) {
-    fade_to_animation(current_animation, animations.FALL, 0.5)
-    return animations.FALL
-  }
-
-  if (on_ground && inputs.dance && current_animation !== animations.DANCE) {
-    fade_to_animation(current_animation, animations.DANCE, 0.3)
-    return animations.DANCE
-  }
-}
-
 /** @type {Type.Module} */
 export default function (shared) {
   const velocity = new Vector3()
-  const model_forward = new Vector3(0, 0, 1)
 
   let jump_state = jump_states.NONE
   let jump_cooldown = 0
-  const current_animation = null
-  let on_ground = 0
-
+  let on_ground = false
   let is_dancing = false
-
   let chunks_loaded = false
 
   return {
@@ -114,7 +55,6 @@ export default function (shared) {
     ) {
       if (!player) return
 
-      const { animations } = player
       const { position } = player
 
       const origin = position.clone()
@@ -234,7 +174,6 @@ export default function (shared) {
         character: {
           capsule_radius: player.radius,
           capsule_segment: player.segment,
-          matrix_world: player.three_body.matrixWorld,
         },
         delta,
         velocity,
@@ -316,7 +255,7 @@ export default function (shared) {
 
           return { x, y, z }
         },
-        new Vector3(),
+        { x: 0, y: 0, z: 0 },
       )
 
       events.on('CHUNKS_LOADED', () => {

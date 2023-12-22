@@ -23,7 +23,7 @@ export default {
   info(text, title = 'AresRPG') {
     VsNotification({
       flat: true,
-      color: 'info',
+      color: 'primary',
       position: 'bottom-right',
       title,
       text,

@@ -100,7 +100,14 @@ export default function () {
       })
 
       aiter(abortable(on(events, 'STATE_UPDATED', { signal }))).reduce(
-        (last_free_camera, { settings: { free_camera } }) => {
+        (
+          last_free_camera,
+          [
+            {
+              settings: { free_camera },
+            },
+          ],
+        ) => {
           if (last_free_camera !== free_camera) {
             if (free_camera) {
               camera_controls.colliderMeshes = []

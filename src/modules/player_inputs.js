@@ -22,9 +22,11 @@ export default function () {
       return state
     },
     observe({ dispatch, signal }) {
+      // @ts-ignore
       aiter(on(window, 'keydown', { signal })).forEach(({ code }) =>
         dispatch('action/keydown', code),
       )
+      // @ts-ignore
       aiter(on(window, 'keyup', { signal })).forEach(({ code }) =>
         dispatch('action/keyup', code),
       )

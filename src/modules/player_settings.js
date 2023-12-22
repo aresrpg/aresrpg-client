@@ -1,7 +1,3 @@
-import { on } from 'events'
-
-import { aiter } from 'iterator-helper'
-
 const MIN_FPS = 5
 const MAX_FPS = 240
 
