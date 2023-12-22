@@ -21,8 +21,8 @@ import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { frameCorners } from 'three/examples/jsm/utils/CameraUtils.js'
 
 import { abortable } from '../utils/iterator.js'
-import portal_model from '../models/empty_portal.gltf?url'
-import tictacworld_model from '../models/tiktakworld.gltf?url'
+import portal_model from '../models/empty_portal.glb?url'
+import tictacworld_model from '../models/tiktakworld.glb?url'
 import { load } from '../utils/load_model'
 import dispose from '../utils/dispose.js'
 
