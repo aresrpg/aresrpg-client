@@ -19,8 +19,10 @@ declare module 'three/addons/capabilities/WebGL.js' {
 declare namespace Type {
   type Module = import('./game').Module
   type State = import('./game').State
-  type Packets = import('aresrpg-protocol/src/types').Packets
+  type Packets = import('@aresrpg/aresrpg-protocol/src/types').Packets
   type GameState = 'MENU' | 'GAME' | 'EDITOR'
+  type Await<T> = T extends Promise<infer U> ? U : T
+  type Position = { x: number; y: number; z: number }
 
   type Entity = {
     id: string
@@ -28,11 +30,12 @@ declare namespace Type {
     three_body: import('three').Object3D
     height: number
     radius: number
-    position: () => import('three').Vector3
-    target_position: import('three').Vector3
-    move: (vector: import('three').Vector3) => void
+    position: import('three').Vector3
+    target_position: Position
+    segment: import('three').Line3
+    move: (vector: Position) => void
     rotate: (vector: import('three').Vector3) => void
-    animate: () => void
+    animate: (clip: string, delta: number) => void
     remove: () => void
   }
 
@@ -56,9 +59,27 @@ declare namespace Type {
       scale: number
       height: number
       octaves: number
-      persistance: number
+      persistence: number
       lacunarity: number
       exponentiation: number
+      painting: {
+        snow_cover_scale: number
+        snow_cover_threshold: number
+        full_snow_altitude: number
+        min_snow_altitude: number
+        full_snow_cover_threshold: number
+        snow_stone_mix_threshold: number
+        stone_noise_scale: number
+        stone_threshold: number
+        stone_color_noise_threshold: number
+        moisture_scale: number
+        moisture_threshold: number
+        sand_noise_scale: number
+        sand_noise_threshold: number
+        grass_noise_scale: number
+        grass_noise_threshold: number
+        dry_grass_noise_threshold: number
+      }
     }
     'action/show_chunk_border': boolean
     'action/free_camera': boolean
@@ -74,7 +95,7 @@ declare namespace Type {
     'action/show_navmesh': boolean
   } & Packets
 
-  type Events = import('aresrpg-protocol/src/types').TypedEmitter<
+  type Events = import('@aresrpg/aresrpg-protocol/src/types').TypedEmitter<
     {
       STATE_UPDATED: State // the game state has been updated
       MOVE_MENU_CAMERA: [number, number, number] // move the camera of the menu screen

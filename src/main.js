@@ -17,7 +17,7 @@ const vue_app = createApp(app)
 
 vue_app
   .use(Vuesax, {
-    colors: {
+    color: {
       primary: '#F1C40F',
       success: '#2ECC71',
       danger: '#E74C3C',

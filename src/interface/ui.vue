@@ -24,7 +24,7 @@
 
 <script setup>
 import { onMounted, onUnmounted, inject, computed, ref, reactive } from 'vue';
-import { to_chunk_position } from 'aresrpg-protocol';
+import { to_chunk_position } from '@aresrpg/aresrpg-protocol';
 
 import pkg from '../../package.json';
 

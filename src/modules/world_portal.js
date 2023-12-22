@@ -78,7 +78,9 @@ function create_collider(
   model.updateMatrixWorld(true)
 
   model.traverse(child => {
+    // @ts-ignore
     if (child.isMesh) {
+      // @ts-ignore
       Object.assign(child.material, child_material)
       child.castShadow = true
       child.receiveShadow = true
@@ -99,6 +101,7 @@ function create_collider(
     remove() {
       dispose(model)
       collider.geometry.dispose()
+      // @ts-ignore
       collider.material.dispose()
     },
   }
@@ -190,7 +193,7 @@ export default function (shared) {
 
   return {
     name: 'world_portal',
-    tick(_, { renderer, camera, scene, collision_queue }) {
+    tick(_, { renderer, camera, scene }) {
       // save the original camera properties
       const currentRenderTarget = renderer.getRenderTarget()
       const currentShadowAutoUpdate = renderer.shadowMap.autoUpdate
@@ -220,7 +223,14 @@ export default function (shared) {
     },
     observe({ events, signal, scene, renderer, camera_controls }) {
       aiter(abortable(on(events, 'STATE_UPDATED', { signal }))).reduce(
-        (last_seed, { world: { seed, biome, heightfield } }) => {
+        (
+          last_seed,
+          [
+            {
+              world: { seed, biome, heightfield },
+            },
+          ],
+        ) => {
           if (last_seed !== seed) {
             const { x, z } = find_flat_surface({
               heightfield,

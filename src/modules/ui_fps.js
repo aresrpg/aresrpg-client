@@ -71,7 +71,13 @@ export default function () {
       show_stats(show_fps)
 
       aiter(abortable(on(events, 'STATE_UPDATED', { signal })))
-        .map(({ settings: { show_fps } }) => show_fps)
+        .map(
+          ([
+            {
+              settings: { show_fps },
+            },
+          ]) => show_fps,
+        )
         .reduce((last_show_fps, show_fps) => {
           if (show_fps !== last_show_fps) show_stats(show_fps)
 

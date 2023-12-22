@@ -24,10 +24,9 @@ DRACO_LOADER.setDecoderConfig({ type: 'js' })
 
 GLTF_LOADER.setDRACOLoader(DRACO_LOADER)
 
-/** @type {(string, object) => Promise<import('three/examples/jsm/loaders/GLTFLoader').GLTF['scene']>} */
 export async function load(
   path,
-  { scale = 1, animations_names, ...material_options } = {},
+  { scale = 1, animations_names = [], envMapIntensity = 1 } = {},
 ) {
   const { scene, animations } = await GLTF_LOADER.loadAsync(path)
   scene.scale.multiplyScalar(scale)
@@ -37,7 +36,8 @@ export async function load(
     if (object.isMesh) {
       object.castShadow = true
       object.receiveShadow = true
-      Object.assign(object.material, material_options)
+      // @ts-ignore
+      Object.assign(object.material, { envMapIntensity })
     }
   })
 

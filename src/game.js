@@ -132,7 +132,7 @@ export const INITIAL_STATE = {
   world: {
     seed: 'aresrpg',
     biome: { ...Biomes.DEFAULT },
-    /** @type {(chunk_position: {x: number, z: number}) => number} */
+    /** @type {(x: number, z: number) => number} */
     heightfield: null,
     navmesh: {
       cell_size: 0.2,
@@ -211,8 +211,7 @@ async function create_context({ send_packet, connect_ws }) {
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setClearColor(0x263238 / 2, 1)
   renderer.shadowMap.enabled = true
-  renderer.physicallyCorrectLights = true
-  renderer.outputEncoding = SRGBColorSpace
+  renderer.outputColorSpace = SRGBColorSpace
   // renderer.shadowMap.type = VSMShadowMap
   renderer.toneMapping = ACESFilmicToneMapping
   renderer.toneMappingExposure = Math.pow(0.9, 5.0)
@@ -229,7 +228,7 @@ async function create_context({ send_packet, connect_ws }) {
 
   const shared = {}
 
-  const Pool = create_pools({ scene, camera, shared })
+  const Pool = create_pools({ scene, shared })
   const orthographic_camera = new OrthographicCamera()
 
   /** @type {Type.Events} */
@@ -245,7 +244,7 @@ async function create_context({ send_packet, connect_ws }) {
     composer,
     shared,
     camera_controls: new CameraControls(camera, renderer.domElement),
-    /** @type {import("aresrpg-protocol/src/types").create_client['send']} */
+    /** @type {import("@aresrpg/aresrpg-protocol/src/types").create_client['send']} */
     send_packet,
     /** @type {() => Promise<void>} */
     connect_ws,
@@ -289,7 +288,6 @@ export default async function create_game({
     camera,
     dispatch,
     composer,
-    collision_queue,
     shared,
   } = context
 

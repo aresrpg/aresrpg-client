@@ -79,7 +79,7 @@ export default function ({ modules }) {
     observe({ events, ...context }) {
       // when we receive a STATE_UPDATED event, we need to enable or disable modules
       aiter(on(events, 'STATE_UPDATED'))
-        .map(({ game_state: new_game_state }) => new_game_state)
+        .map(([{ game_state: new_game_state }]) => new_game_state)
         .forEach(async new_game_state => {
           if (game_state !== new_game_state) {
             game_state = new_game_state // Update the game state

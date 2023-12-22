@@ -1,5 +1,5 @@
 import ndarray from 'ndarray'
-import { CHUNK_SIZE, WORLD_HEIGHT } from 'aresrpg-protocol'
+import { CHUNK_SIZE, WORLD_HEIGHT } from '@aresrpg/aresrpg-protocol'
 
 import greedy_mesh from './greedy_mesh.js'
 import { create_fractionnal_brownian } from './noise.js'
