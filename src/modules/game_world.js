@@ -21,7 +21,7 @@ import {
   spiral_array,
   square_array,
   CHUNK_SIZE,
-} from '@aresrpg/aresrpg-protocol/src/chunk.js'
+} from '@aresrpg/aresrpg-protocol'
 import { aiter, iter } from 'iterator-helper'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
@@ -468,7 +468,7 @@ export default function (shared) {
 
       // handle low details chunks
       aiter(abortable(on(events, 'CHANGE_CHUNK', { signal }))).forEach(
-        async current_chunk => {
+        async ([current_chunk]) => {
           try {
             const {
               settings,
@@ -481,8 +481,6 @@ export default function (shared) {
               settings.view_distance + 1,
               settings.far_view_distance,
             ).map(make_chunk_key)
-
-            const geometries = []
 
             const low_detail_plane_geometry =
               await request_low_detail_chunks_load({

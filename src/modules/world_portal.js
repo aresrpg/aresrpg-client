@@ -227,7 +227,7 @@ export default function (shared) {
           last_seed,
           [
             {
-              world: { seed, biome, heightfield },
+              world: { seed, heightfield },
             },
           ],
         ) => {
@@ -241,7 +241,7 @@ export default function (shared) {
               max_search_radius: 1000,
             })
 
-            const portal1_position = new Vector3(-245, 19, 115)
+            const portal1_position = new Vector3(-245, 1, 115)
 
             const portal1 = create_collider(
               loaded_portal.model,
@@ -271,7 +271,7 @@ export default function (shared) {
                 camera_controls.setLookAt(
                   -292,
                   2004,
-                  98,
+                  97,
                   position.x,
                   position.y,
                   position.z,
@@ -310,11 +310,11 @@ export default function (shared) {
             shared.add_sensor({
               sensor: rightPortal,
               on_collide: player => {
-                const position = new Vector3(-243, 22, 119)
+                const position = new Vector3(-244, 4, 117)
                 camera_controls.setLookAt(
-                  portal1_position.x,
-                  portal1_position.y,
-                  portal1_position.z,
+                  -246,
+                  7,
+                  113,
                   position.x,
                   position.y,
                   position.z,
