@@ -130,7 +130,7 @@ export const INITIAL_STATE = {
   },
 
   world: {
-    seed: 'aresrpg_',
+    seed: '',
     biome: { ...Biomes.DEFAULT },
     /** @type {(x: number, z: number) => number} */
     heightfield: null,

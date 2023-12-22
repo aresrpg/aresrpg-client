@@ -243,7 +243,11 @@ export default function (shared) {
           if (!player) return last_position
 
           const { position } = player
-          const { x, y, z } = position
+
+          // round position with 2 decimals
+          const x = Math.round(position.x * 100) / 100
+          const y = Math.round(position.y * 100) / 100
+          const z = Math.round(position.z * 100) / 100
 
           if (
             last_position.x !== x ||
