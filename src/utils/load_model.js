@@ -1,21 +1,14 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader'
-import {
-  AnimationMixer,
-  Box3,
-  DefaultLoadingManager,
-  DoubleSide,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  MeshToonMaterial,
-  Vector3,
-} from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils'
-import { StaticGeometryGenerator } from 'three-mesh-bvh'
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { AnimationMixer, DefaultLoadingManager } from 'three'
+import { MeshoptDecoder } from 'meshoptimizer'
 
-const GLTF_LOADER = new GLTFLoader()
-const DRACO_LOADER = new DRACOLoader()
+const GLTF_LOADER = new GLTFLoader(DefaultLoadingManager).setCrossOrigin(
+  'anonymous',
+)
+const DRACO_LOADER = new DRACOLoader(DefaultLoadingManager)
+const KTX2_LOADER = new KTX2Loader(DefaultLoadingManager)
 
 DRACO_LOADER.setDecoderPath(
   'https://www.gstatic.com/draco/versioned/decoders/1.5.6/',
@@ -23,6 +16,8 @@ DRACO_LOADER.setDecoderPath(
 DRACO_LOADER.setDecoderConfig({ type: 'js' })
 
 GLTF_LOADER.setDRACOLoader(DRACO_LOADER)
+GLTF_LOADER.setKTX2Loader(KTX2_LOADER)
+GLTF_LOADER.setMeshoptDecoder(MeshoptDecoder)
 
 export async function load(
   path,
