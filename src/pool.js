@@ -24,6 +24,8 @@ import step6 from './assets/sound/step6.ogg'
 import { load } from './utils/load_model.js'
 import iop_male from './models/iop.glb?url'
 
+const FRAME_ANIMATION_SKIP = 3
+
 const throttle = (action, interval) => {
   let last_time = 0
   return (...args) => {
@@ -131,7 +133,7 @@ function fade_to_animation(from, to, duration = 0.3) {
 export default function create_pools({ scene, shared }) {
   function create_pool(
     { model, compute_animations },
-    { count, scale = 1, height, radius },
+    { count, height, radius },
   ) {
     const data = Array.from({ length: count }).map(() => {
       const cloned_body = clone(model)
@@ -174,10 +176,9 @@ export default function create_pools({ scene, shared }) {
 
     return {
       data,
-      /** @type {(options?: { add_rigid_body: boolean, fixed_title_aspect: boolean }) => Type.Entity} */
+      /** @type {(options?: {  fixed_title_aspect: boolean }) => Type.Entity} */
       get(
-        { add_rigid_body, fixed_title_aspect } = {
-          add_rigid_body: false,
+        { fixed_title_aspect } = {
           fixed_title_aspect: false,
         },
       ) {
@@ -210,6 +211,8 @@ export default function create_pools({ scene, shared }) {
         scene.add(title)
 
         shared.outline.selectedObjects.push(body)
+
+        let animation_frame_skipped = 0
 
         return {
           id: '',
@@ -246,6 +249,9 @@ export default function create_pools({ scene, shared }) {
             body.quaternion.slerp(quaternion, 0.2)
           },
           animate(clip, delta) {
+            if (animation_frame_skipped++ < FRAME_ANIMATION_SKIP) return
+            animation_frame_skipped = 0
+
             animations.mixer.update(delta)
 
             if (clip === 'RUN') play_step_sound()
