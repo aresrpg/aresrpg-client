@@ -9,9 +9,49 @@
     <img src="https://img.shields.io/discord/265104803531587584.svg?logo=discord&style=for-the-badge" alt="Chat"/>
   </a>
 </p>
-<h3 align=center>Web Client for AresRPG</h3>
+<h3 align=center>AresRPG is a Browser based MMORPG</h3>
+
+### Hello World
+
+AresRPG has been a minecraft server project for years and is now upgraded to a standalone game on top of [ThreeJS](https://threejs.org/), the project is in a very early stage and everyone is welcomed to contribute to its realization
+
+![](https://i.imgur.com/csWCkeW.png)
+
+- Try it out at https://play.aresrpg.world
+
+## Contribute
+
+You can run the client locally and communicate directly with the server by using your authentication cookie.
+
+> Note that at the moment only users with an early access key or a Staff discord rank are able to access the websocket
+
+- Login at https://app.aresrpg.world
+- Go to your `application` tab in the devtools and find the `aresrpg_` cookie
+
+```sh
+git clone git@github.com:aresrpg/app.git
+cd app
+```
+
+- Create a `.env` file
 
 ```
-npm i
+VITE_API="/api"
+VITE_WS="ws://localhost:5174/ws"
+VITE_DEV_AUTH_TOKEN="the content of the auth cookie"
+```
+
+- Run the client
+
+```
+npm install
 npm start
 ```
+
+Once you've made a super cool feature, you can open a pull request on this page 🥇
+
+If it's accepted and significant enough, you'll win the contributor badge in the game !
+
+## Protocol
+
+To understand better how to communicate with the server, check the [protocol repo](https://github.com/aresrpg/aresrpg-protocol), it contains a D2 schema file and the proto definition
