@@ -10,21 +10,17 @@ import {
   Vector3,
   WebGLRenderTarget,
 } from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { frameCorners } from 'three/examples/jsm/utils/CameraUtils.js'
 
 import { abortable } from '../utils/iterator.js'
-import portal_model from '../models/empty_portal.glb?url'
-import tictacworld_model from '../models/tiktakworld.glb?url'
-import { load } from '../utils/load_model'
 import dispose from '../utils/dispose.js'
 
-const loaded_portal = await load(portal_model, {
-  scale: 1.3,
-  envMapIntensity: 0.1,
-})
-const tictacworld = await load(tictacworld_model, { scale: 0.5 })
+// const loaded_portal = await load(portal_model, {
+//   scale: 1.3,
+//   envMapIntensity: 0.1,
+// })
+// const tictacworld = await load(tictacworld_model, { scale: 0.5 })
 
 function find_flat_surface({
   heightfield,

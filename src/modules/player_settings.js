@@ -5,6 +5,13 @@ const MAX_FPS = 240
 export default function () {
   return {
     name: 'player_settings',
+    tick({ player, settings: { show_entities_collider, debug_mode } }) {
+      if (debug_mode && player?.collider) {
+        const { collider } = player
+        if (collider && collider.visible !== show_entities_collider)
+          collider.visible = show_entities_collider
+      }
+    },
     reduce(state, { type, payload }) {
       switch (type) {
         case 'action/show_fps':
@@ -23,14 +30,6 @@ export default function () {
               target_fps: Math.max(MIN_FPS, Math.min(MAX_FPS, payload)),
             },
           }
-        case 'action/game_speed':
-          return {
-            ...state,
-            settings: {
-              ...state.settings,
-              game_speed: Math.max(0, Math.min(2, payload)),
-            },
-          }
         case 'action/show_terrain_collider':
           return {
             ...state,
@@ -47,28 +46,12 @@ export default function () {
               show_entities_collider: payload,
             },
           }
-        case 'action/show_terrain':
-          return {
-            ...state,
-            settings: {
-              ...state.settings,
-              show_terrain: payload,
-            },
-          }
-        case 'action/show_entities':
-          return {
-            ...state,
-            settings: {
-              ...state.settings,
-              show_entities: payload,
-            },
-          }
         case 'action/view_distance':
           return {
             ...state,
             settings: {
               ...state.settings,
-              view_distance: Math.max(3, Math.min(20, payload)),
+              view_distance: Math.max(1, Math.min(15, payload)),
             },
           }
         case 'action/far_view_distance':
@@ -76,15 +59,7 @@ export default function () {
             ...state,
             settings: {
               ...state.settings,
-              far_view_distance: Math.max(3, Math.min(50, payload)),
-            },
-          }
-        case 'action/biome_settings':
-          return {
-            ...state,
-            world: {
-              ...state.world,
-              biome: payload,
+              far_view_distance: Math.max(5, Math.min(60, payload)),
             },
           }
         case 'action/show_chunk_border':
@@ -101,22 +76,6 @@ export default function () {
             settings: {
               ...state.settings,
               free_camera: payload,
-            },
-          }
-        case 'action/show_navmesh':
-          return {
-            ...state,
-            settings: {
-              ...state.settings,
-              show_navmesh: payload,
-            },
-          }
-        case 'action/navmesh_settings':
-          return {
-            ...state,
-            world: {
-              ...state.world,
-              navmesh: payload,
             },
           }
       }

@@ -21,7 +21,7 @@ import { abortable } from '../utils/iterator.js'
 
 const CAMERA_MAX_POLAR_ANGLE = Math.PI * 0.5 * 0.7 //  70% of the half PI
 const CAMERA_MIN_ZOOM = 4
-const CAMERA_MAX_ZOOM = 14
+const CAMERA_MAX_ZOOM = 500
 
 /** @type {import("../game").Module} */
 export default function () {
@@ -38,9 +38,7 @@ export default function () {
       if (!player) return
 
       if (!free_camera) {
-        const {
-          position: { x, y, z },
-        } = player
+        const { x, y, z } = player.position
 
         camera_controls.moveTo(x, y, z, true)
         camera_controls.setTarget(x, y, z, true)

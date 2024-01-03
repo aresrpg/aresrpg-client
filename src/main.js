@@ -13,6 +13,16 @@ import toast from './toast'
 
 inject()
 
+console.log(
+  `%c You're curious, I like you 🤭🍑`,
+  'color: #1565C0;font-weight:bold;font-size:22px;',
+)
+console.log(
+  "%c but don't bother, i'm open-source!",
+  'color: #E67E22;font-size:18px;',
+)
+console.log('%c https://github.com/aresrpg/aresrpg-client', 'font-size:15px;')
+
 const vue_app = createApp(app)
 
 vue_app

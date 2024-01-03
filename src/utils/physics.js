@@ -1,35 +1,57 @@
-import { Box3, Line3, Matrix4, Vector3 } from 'three'
+import { Box3, Line3, Matrix4, Raycaster, Vector3 } from 'three'
 
 const axis_aligned_bounding_box = new Box3()
-const terrain_matrix_in_local_space = new Matrix4()
+const terrain_collider_matrix_in_local_space = new Matrix4()
 const segment = new Line3()
 
 const temporary_vector = new Vector3()
 const temporary_vector2 = new Vector3()
 
+const ray = new Raycaster()
+const down_vector = new Vector3(0, -1, 0)
+
+ray.firstHitOnly = true
+ray.far = 5
+
+const raycast_result = []
+
+export function distance_from_ground({ position, height }, scene) {
+  ray.set(position, down_vector)
+
+  raycast_result.length = 0
+
+  ray.intersectObjects(scene.children, false, raycast_result)
+  if (raycast_result.length) {
+    const [{ distance }] = raycast_result
+    return distance - height
+  }
+
+  return Infinity
+}
+
 export function compute_movements({
-  player: { three_body, move, position },
-  terrain,
+  dummy,
+  terrain_collider,
   character: { capsule_radius, capsule_segment },
   delta,
   velocity,
   objects,
 }) {
-  if (!terrain) throw new Error('Missing terrain')
+  if (!terrain_collider) throw new Error('Missing terrain_collider')
 
   let is_on_ground = false
 
-  Array.from([terrain, ...objects]).forEach(collider => {
+  Array.from([terrain_collider, ...objects]).forEach(collider => {
     axis_aligned_bounding_box.makeEmpty()
-    terrain_matrix_in_local_space.copy(collider.matrixWorld).invert()
+    terrain_collider_matrix_in_local_space.copy(collider.matrixWorld).invert()
     segment.copy(capsule_segment)
 
     segment.start
-      .applyMatrix4(three_body.matrixWorld)
-      .applyMatrix4(terrain_matrix_in_local_space)
+      .applyMatrix4(dummy.matrixWorld)
+      .applyMatrix4(terrain_collider_matrix_in_local_space)
     segment.end
-      .applyMatrix4(three_body.matrixWorld)
-      .applyMatrix4(terrain_matrix_in_local_space)
+      .applyMatrix4(dummy.matrixWorld)
+      .applyMatrix4(terrain_collider_matrix_in_local_space)
 
     axis_aligned_bounding_box.expandByPoint(segment.start)
     axis_aligned_bounding_box.expandByPoint(segment.end)
@@ -57,9 +79,12 @@ export function compute_movements({
 
     const new_position = temporary_vector
       .copy(segment.start)
-      .applyMatrix4(terrain.matrixWorld)
+      .applyMatrix4(terrain_collider.matrixWorld)
 
-    const delta_vector = temporary_vector2.subVectors(new_position, position)
+    const delta_vector = temporary_vector2.subVectors(
+      new_position,
+      dummy.position,
+    )
 
     const character_grounded =
       delta_vector.y > Math.abs(delta * velocity.y * 0.25)
@@ -68,9 +93,9 @@ export function compute_movements({
 
     delta_vector.normalize().multiplyScalar(offset_minus_epsilon)
 
-    move(temporary_vector.copy(position).add(delta_vector))
+    dummy.position.copy(temporary_vector.copy(dummy.position).add(delta_vector))
 
-    three_body.updateMatrixWorld()
+    dummy.updateMatrixWorld()
 
     if (!character_grounded) {
       delta_vector.normalize()

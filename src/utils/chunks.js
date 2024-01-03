@@ -1,34 +1,26 @@
 import {
-  BackSide,
   BoxGeometry,
-  BufferAttribute,
   BufferGeometry,
-  Color,
-  DoubleSide,
   Float32BufferAttribute,
-  FrontSide,
-  Group,
-  InstancedMesh,
-  MathUtils,
+  Int32BufferAttribute,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
-  MeshPhongMaterial,
   MeshStandardMaterial,
-  MeshToonMaterial,
+  Quaternion,
   Uint32BufferAttribute,
   Vector3,
 } from 'three'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import workerpool from 'workerpool'
 import { CHUNK_SIZE } from '@aresrpg/aresrpg-protocol'
 import { WORLD_HEIGHT } from '@aresrpg/aresrpg-protocol/src/chunk.js'
 import { MeshBVH, StaticGeometryGenerator } from 'three-mesh-bvh'
 
 import Biomes from '../world_gen/biomes.js'
-import greedy_mesh from '../world_gen/greedy_mesh.js'
-import { from_chunk_key } from '../modules/game_world.js'
 import chunk_worker from '../world_gen/chunk_worker.js?worker&url'
+import { VOLUME_SIZE_BYTES, read_volume } from '../world_gen/greedy_mesh.js'
+
+import InstancedVolume from './InstancedVolume.js'
 
 const pool = workerpool.pool(chunk_worker, {
   workerOpts: {
@@ -36,126 +28,64 @@ const pool = workerpool.pool(chunk_worker, {
   },
 })
 
-const SEGMENTS = 16
+export const instanced_volume = new InstancedVolume()
 
-export async function request_low_detail_chunks_load({ chunks, seed, biome }) {
-  const geometries_data = await Promise.all(
-    chunks.map(async key => {
-      const { x, z } = from_chunk_key(key)
+/** @typedef {Type.Await<ReturnType<request_chunk_load>>} chunk */
 
-      const { vertices, colors, indices } = await pool.exec(
-        'create_low_detail_chunk_column',
-        [x, z, biome, seed, SEGMENTS],
-      )
+export const CHUNK_CACHE = new Map()
+export const PLANE_CHUNK_CACHE = new Map()
 
-      // Convert vertices, colors, and indices to typed arrays
-      const vertices_array = new Float32Array(vertices)
-      const colors_array = new Float32Array(colors)
-      const indices_array = new Uint32Array(indices) // assuming indices are of type number
-
-      return {
-        vertices: vertices_array,
-        colors: colors_array,
-        indices: indices_array,
-      }
-    }),
-  )
-
-  const total_vertices = geometries_data.reduce(
-    (acc, data) => acc + data.vertices.length,
-    0,
-  )
-  const total_colors = geometries_data.reduce(
-    (acc, data) => acc + data.colors.length,
-    0,
-  )
-  const total_indices = geometries_data.reduce(
-    (acc, data) => acc + data.indices.length,
-    0,
-  )
-
-  // Create SharedArrayBuffers
-  const vertices_buffer = new SharedArrayBuffer(total_vertices * 4) // Float32 needs 4 bytes
-  const colors_buffer = new SharedArrayBuffer(total_colors * 4) // Float32 needs 4 bytes
-  const indices_buffer = new SharedArrayBuffer(total_indices * 4) // Assuming Uint32
-
-  const shallow_geometry = await pool.exec('merge_geometries', [
-    geometries_data,
+/**
+ *
+ * @param {object} param0
+ * @param {number} param0.x
+ * @param {number} param0.z
+ * @param {string} param0.seed
+ */
+export async function request_chunk_load({ x, z, seed }, scene) {
+  const volumes_buffer = await pool.exec('create_voxel_chunk_column', [
     {
-      vertices_buffer,
-      colors_buffer,
-      indices_buffer,
+      chunk_x: x,
+      chunk_z: z,
+      seed,
+      biome: Biomes.DEFAULT,
     },
   ])
 
-  const geometry = new BufferGeometry()
-
-  geometry.setAttribute(
-    'position',
-    new Float32BufferAttribute(new Float32Array(vertices_buffer), 3),
-  )
-  geometry.setAttribute(
-    'color',
-    new Float32BufferAttribute(new Float32Array(colors_buffer), 3),
-  )
-  geometry.setIndex(
-    new Uint32BufferAttribute(new Uint32Array(indices_buffer), 1),
-  )
-
-  return geometry
-}
-
-export async function request_chunk_load({
-  chunk_x,
-  chunk_z,
-  seed,
-  biome = Biomes.DEFAULT,
-}) {
-  /** @type {ReturnType<import("../world_gen/create_chunk.js")["create_chunk_column"]>} */
-  const volumes = await pool.exec('create_chunk_column', [
-    chunk_x,
-    chunk_z,
-    biome,
-    seed,
-  ])
-
-  // Create an InstancedMesh for rendering
-  const voxel_geometry = new BoxGeometry(1, 1, 1)
-  const material = new MeshPhongMaterial({
-    side: FrontSide,
-    specular: 0x404040,
-  })
-  const mesh = new InstancedMesh(voxel_geometry, material, volumes.length)
-
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  mesh.position.set(chunk_x * CHUNK_SIZE, 0, chunk_z * CHUNK_SIZE)
-
-  // Array to store mesh data for collision
-  const collision_vertices = []
-  const collision_indices = []
+  const origin_x = x * CHUNK_SIZE
+  const origin_z = z * CHUNK_SIZE
 
   const meshes = []
+  const instanced_datas = []
+  const view = new DataView(volumes_buffer)
+  const reusable_matrix = new Matrix4()
+  const reusable_position = new Vector3()
+  const reusable_quaternion = new Quaternion()
+  const reusable_scale = new Vector3(1, 1, 1)
 
-  // Process greedy volumes for rendering and collision
-  volumes.forEach((volume, index) => {
+  for (
+    let offset = 0;
+    offset < volumes_buffer.byteLength;
+    offset += VOLUME_SIZE_BYTES
+  ) {
+    const volume = read_volume(offset, view)
+    if (!volume) continue
+
     // Calculate the dimensions of the volume
     const width = volume.max.x - volume.min.x + 1
     const height = volume.max.y - volume.min.y + 1
     const depth = volume.max.z - volume.min.z + 1
 
     // For rendering: create a matrix for the instanced mesh
-    const matrix = new Matrix4()
-    matrix.makeTranslation(
-      volume.min.x + width / 2,
-      volume.min.y + height / 2,
-      volume.min.z + depth / 2,
+    reusable_matrix.compose(
+      reusable_position.set(
+        origin_x + volume.min.x + width / 2,
+        volume.min.y + height / 2,
+        origin_z + volume.min.z + depth / 2,
+      ),
+      reusable_quaternion,
+      reusable_scale.set(width, height, depth),
     )
-    matrix.scale(new Vector3(width, height, depth))
-
-    // Apply color and matrix to the instanced mesh
-    mesh.setColorAt(index, new Color(volume.color))
-    mesh.setMatrixAt(index, matrix)
 
     // For collision: create geometry for the volume
     const volume_geometry = new BoxGeometry(width, height, depth)
@@ -167,11 +97,13 @@ export async function request_chunk_load({
       volume.min.z + depth / 2,
     )
 
-    volume_geometry.translate(chunk_x * CHUNK_SIZE, 0, chunk_z * CHUNK_SIZE)
+    volume_geometry.translate(x * CHUNK_SIZE, 0, z * CHUNK_SIZE)
     meshes.push(new Mesh(volume_geometry))
-  })
-
-  mesh.instanceMatrix.needsUpdate = true
+    instanced_datas.push({
+      matrix: reusable_matrix.clone(),
+      block: volume.block,
+    })
+  }
 
   const collision_geometry = new StaticGeometryGenerator(meshes).generate()
 
@@ -180,12 +112,18 @@ export async function request_chunk_load({
     new MeshStandardMaterial({
       wireframe: true,
       color: 0x76ff03,
-      emissive: 0x76ff03,
+      // emissive: 0x76ff03,
+      envMapIntensity: 0.1,
     }),
   )
 
+  collider_mesh.receiveShadow = true
+  collider_mesh.castShadow = true
+  collider_mesh.name = `collider ${x}:${z}`
+
   meshes.forEach(mesh => {
     mesh.geometry.dispose()
+    // @ts-ignore
     mesh.material.dispose()
   })
 
@@ -201,23 +139,84 @@ export async function request_chunk_load({
   )
 
   chunk_border.position.set(
-    chunk_x * CHUNK_SIZE + CHUNK_SIZE / 2,
+    x * CHUNK_SIZE + CHUNK_SIZE / 2,
     WORLD_HEIGHT / 2,
-    chunk_z * CHUNK_SIZE + CHUNK_SIZE / 2,
+    z * CHUNK_SIZE + CHUNK_SIZE / 2,
   )
 
-  return {
+  chunk_border.visible = false
+  collider_mesh.visible = false
+
+  chunk_border.name = `border ${x}:${z}`
+  scene.add(chunk_border)
+
+  const chunk = {
     chunk_border,
-    terrain: mesh,
+    instanced_datas,
     collider: collider_mesh,
     dispose() {
-      mesh.dispose()
-      mesh.geometry.dispose()
-      mesh.material.dispose()
+      scene.remove(collider_mesh)
+      scene.remove(chunk_border)
+
       collider_mesh.geometry.dispose()
       collider_mesh.material.dispose()
       chunk_border.geometry.dispose()
       chunk_border.material.dispose()
     },
   }
+
+  return chunk
 }
+
+const SEGMENTS = 2
+
+export async function request_plane_chunks_load({ chunks, seed }) {
+  const geometry_buffers = await Promise.all(
+    chunks.map(async key => {
+      const { x, z } = from_chunk_key(key)
+
+      if (PLANE_CHUNK_CACHE.has(key)) return PLANE_CHUNK_CACHE.get(key)
+
+      const generated = {
+        chunk_x: x,
+        chunk_z: z,
+        segments: SEGMENTS,
+        ...(await pool.exec('create_plane_chunk_column', [
+          {
+            chunk_x: x,
+            chunk_z: z,
+            seed,
+            segments: SEGMENTS,
+            biome: Biomes.DEFAULT,
+          },
+        ])),
+      }
+
+      PLANE_CHUNK_CACHE.set(key, generated)
+
+      return generated
+    }),
+  )
+
+  const { vertices, colors, indices } = await pool.exec('merge_plane_columns', [
+    geometry_buffers,
+  ])
+
+  const geometry = new BufferGeometry()
+
+  geometry.setAttribute(
+    'position',
+    new Float32BufferAttribute(new Float32Array(vertices), 3),
+  )
+  geometry.setAttribute(
+    'color',
+    new Float32BufferAttribute(new Float32Array(colors), 3),
+  )
+  geometry.setIndex(new Uint32BufferAttribute(new Uint32Array(indices), 1))
+
+  return geometry
+}
+
+export const make_chunk_key = ({ x, z, seed }) => JSON.stringify({ x, z, seed })
+
+export const from_chunk_key = key => JSON.parse(key)

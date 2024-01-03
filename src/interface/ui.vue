@@ -25,6 +25,7 @@
 <script setup>
 import { onMounted, onUnmounted, inject, computed, ref, reactive } from 'vue';
 import { to_chunk_position } from '@aresrpg/aresrpg-protocol';
+import { Vector3 } from 'three';
 
 import pkg from '../../package.json';
 
@@ -39,9 +40,7 @@ const server_info = reactive({
 
 const position = computed(() => {
   if (!state.value.player?.position) return [0, 0, 0];
-  const {
-    position: { x, y, z },
-  } = state.value.player;
+  const { x, y, z } = state.value.player.position;
   return [Math.round(x), Math.round(y), Math.round(z)];
 });
 

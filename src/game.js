@@ -1,4 +1,4 @@
-import { EventEmitter, on } from 'events'
+import { EventEmitter } from 'events'
 import { PassThrough } from 'stream'
 
 import {
@@ -8,12 +8,10 @@ import {
   WebGLRenderer,
   PerspectiveCamera,
   Fog,
-  AnimationAction,
   SRGBColorSpace,
   VSMShadowMap,
   DefaultLoadingManager,
   ACESFilmicToneMapping,
-  FogExp2,
   Vector2,
   Vector4,
   Quaternion,
@@ -23,12 +21,11 @@ import {
   Sphere,
   Raycaster,
   OrthographicCamera,
+  Clock,
 } from 'three'
-import merge from 'fast-merge-async-iterators'
 import { aiter } from 'iterator-helper'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import CameraControls from 'camera-controls'
-import { init as init_recast_navigation } from 'recast-navigation'
 
 import { combine } from './utils/iterator.js'
 import ui_fps from './modules/ui_fps.js'
@@ -46,16 +43,18 @@ import logger from './utils/logger.js'
 import game_sky from './modules/game_sky.js'
 import game_connect from './modules/game_connect.js'
 import player_characters from './modules/player_characters.js'
-import game_world from './modules/game_world.js'
 import create_pools from './pool.js'
-import game_nature from './modules/game_nature.js'
-import Biomes from './world_gen/biomes.js'
-import world_portal from './modules/world_portal.js'
+import game_lights from './modules/game_lights.js'
+import game_portal from './modules/game_portal.js'
+import create_shared_state from './shared_state.js'
+import game_audio from './modules/game_audio.js'
+import game_entities from './modules/game_entities.js'
+import game_chunks from './modules/game_chunks.js'
+import player_spawn from './modules/player_spawn.js'
+import game_instanced from './modules/game_instanced.js'
+import TaskManager from './utils/TaskManager.js'
 
 export const GRAVITY = 9.81
-export const PLAYER_ID = 'player'
-
-await init_recast_navigation()
 
 const DEBUG_MODE = true
 const LOADING_MANAGER = DefaultLoadingManager
@@ -68,6 +67,8 @@ export const FILTER_PACKET_IN_LOGS = [
   'packet/playerPosition',
   'packet/entityMove',
 ]
+
+export const TASK_MANAGER = new TaskManager()
 
 LOADING_MANAGER.onStart = (url, itemsLoaded, itemsTotal) => {
   window.dispatchEvent(new Event('assets_loading'))
@@ -91,8 +92,7 @@ export const INITIAL_STATE = {
   /** @type {Type.GameState} */
   game_state: 'MENU',
   settings: {
-    target_fps: 60,
-    game_speed: 1,
+    target_fps: 120,
     mouse_sensitivity: 0.005,
     show_fps: true,
     keymap: new Map([
@@ -102,15 +102,15 @@ export const INITIAL_STATE = {
       ['KeyD', 'right'],
       ['Space', 'jump'],
       ['KeyF', 'dance'],
+      ['ShiftLeft', 'walk'],
     ]),
     show_terrain: true,
-    show_entities: true,
     show_terrain_collider: false,
     show_entities_collider: false,
     show_navmesh: false,
 
-    view_distance: 5,
-    far_view_distance: 10,
+    view_distance: 3,
+    far_view_distance: 20,
     show_chunk_border: false,
 
     free_camera: false,
@@ -125,24 +125,15 @@ export const INITIAL_STATE = {
     backward: false,
     left: false,
     right: false,
+    walk: false,
     jump: false,
     dance: false,
   },
 
   world: {
     seed: '',
-    biome: { ...Biomes.DEFAULT },
     /** @type {(x: number, z: number) => number} */
     heightfield: null,
-    navmesh: {
-      cell_size: 0.2,
-      cell_height: 0.2,
-      walkable_slope_angle: 45,
-      walkable_radius: 0.5,
-      walkable_climb: 2,
-      walkable_height: 2,
-      min_region_area: 12,
-    },
   },
 
   /** @type {Type.Entity} */
@@ -184,12 +175,22 @@ const PERMANENT_MODULES = [
   game_connect,
   player_characters,
   game_render,
-  game_nature,
+  game_lights,
+  game_instanced,
 ]
 
 const GAME_MODULES = {
   MENU: [main_menu],
-  GAME: [ui_settings, player_movement, game_camera, game_world, world_portal],
+  GAME: [
+    ui_settings,
+    player_movement,
+    player_spawn,
+    game_camera,
+    game_audio,
+    game_entities,
+    game_chunks,
+    // game_portal,
+  ],
 }
 
 function last_event_value(emitter, event, default_value = null) {
@@ -205,7 +206,7 @@ async function create_context({ send_packet, connect_ws }) {
   scene.background = new Color('#E0E0E0')
   scene.fog = new Fog('#E0E0E0', 0, 1500)
 
-  const renderer = new WebGLRenderer()
+  const renderer = new WebGLRenderer({ antialias: true })
 
   renderer.setPixelRatio(window.devicePixelRatio)
   renderer.setSize(window.innerWidth, window.innerHeight)
@@ -215,6 +216,7 @@ async function create_context({ send_packet, connect_ws }) {
   // renderer.shadowMap.type = VSMShadowMap
   renderer.toneMapping = ACESFilmicToneMapping
   renderer.toneMappingExposure = Math.pow(0.9, 5.0)
+  renderer.info.autoReset = false
 
   const composer = new EffectComposer(renderer)
   composer.setSize(window.innerWidth, window.innerHeight)
@@ -226,7 +228,7 @@ async function create_context({ send_packet, connect_ws }) {
     1500, // Far clipping plane
   )
 
-  const shared = {}
+  const shared = create_shared_state({ scene, camera })
 
   const Pool = create_pools({ scene, shared })
   const orthographic_camera = new OrthographicCamera()
@@ -262,12 +264,6 @@ async function create_context({ send_packet, connect_ws }) {
     camera,
     /** @type {AbortSignal} */
     signal: new AbortController().signal,
-    navigation: {
-      /** @type {import('recast-navigation').NavMesh} */
-      navmesh: null,
-      /** @type {import('recast-navigation').NavMeshQuery} */
-      navmesh_query: null,
-    },
   }
 }
 
@@ -283,9 +279,9 @@ export default async function create_game({
   const {
     events,
     scene,
+    camera,
     renderer,
     get_state,
-    camera,
     dispatch,
     composer,
     shared,
@@ -344,46 +340,37 @@ export default async function create_game({
 
   dispatch('action/load_game_state', 'MENU')
 
-  function animation() {
-    let frame_duration = 1000 / INITIAL_STATE.settings.target_fps
-    let last_frame_time = performance.now()
-    let { game_speed } = INITIAL_STATE.settings
+  const clock = new Clock()
+  let frame_duration = 1000 / INITIAL_STATE.settings.target_fps
+  let time_target = 0
 
-    document.addEventListener('visibilitychange', event => {
-      if (!document.hidden) last_frame_time = performance.now()
-    })
+  function animate() {
+    requestAnimationFrame(animate)
 
-    return function animate(current_time) {
-      requestAnimationFrame(animate)
+    if (performance.now() >= time_target) {
+      const state = get_state()
+      const delta = Math.min(clock.getDelta(), 0.5)
 
-      const real_delta = current_time - last_frame_time
-      const game_delta = real_delta * game_speed // Slow-motion effect on game logic
+      permanent_modules
+        .map(({ tick }) => tick)
+        .filter(Boolean)
+        .forEach(tick => tick(state, context, delta))
 
-      if (real_delta >= frame_duration && real_delta < 500) {
-        const state = get_state()
-        const delta_seconds = game_delta / 1000
+      modules_loader.tick(state, context, delta)
 
-        permanent_modules
-          .map(({ tick }) => tick)
-          .filter(Boolean)
-          .forEach(tick => tick(state, context, delta_seconds))
+      renderer.info.reset()
+      // renderer.render(scene, camera)
+      composer.render()
 
-        modules_loader.tick(state, context, delta_seconds)
-        // renderer.render(scene, camera)
-        composer.render()
+      TASK_MANAGER.tick(time_target + frame_duration - performance.now())
 
-        last_frame_time = current_time - (real_delta % frame_duration)
+      const next_frame_duration = 1000 / state.settings.target_fps
 
-        const updated_fps = state?.settings?.target_fps
-        if (
-          updated_fps != null &&
-          updated_fps !== INITIAL_STATE.settings.target_fps
-        )
-          frame_duration = 1000 / state.settings.target_fps
-        const udpated_game_speed = state?.settings?.game_speed
-        if (udpated_game_speed != null && udpated_game_speed !== game_speed)
-          game_speed = udpated_game_speed
-      }
+      if (frame_duration !== next_frame_duration)
+        frame_duration = next_frame_duration
+
+      time_target += frame_duration
+      if (performance.now() >= time_target) time_target = performance.now()
     }
   }
 
@@ -393,7 +380,7 @@ export default async function create_game({
     send_packet,
     start(container) {
       container.appendChild(renderer.domElement)
-      animation()(performance.now())
+      animate()
     },
     stop() {},
   }

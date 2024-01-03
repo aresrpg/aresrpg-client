@@ -1,4 +1,4 @@
-import { CubeTextureLoader, sRGBEncoding } from 'three'
+import { CubeTextureLoader, SRGBColorSpace } from 'three'
 
 import day_nx from '../assets/skybox/day_nx.jpg'
 import day_ny from '../assets/skybox/day_ny.jpg'
@@ -13,7 +13,7 @@ import night_px from '../assets/skybox/night_px.png'
 import night_py from '../assets/skybox/night_py.png'
 import night_pz from '../assets/skybox/night_pz.png'
 
-import { DAY_DURATION } from './game_nature.js'
+import { DAY_DURATION } from './game_lights.js'
 
 /** @type {Type.Module} */
 export default function () {
@@ -29,7 +29,7 @@ export default function () {
         day_pz,
         day_nz,
       ])
-      day_skybox.encoding = sRGBEncoding
+      day_skybox.colorSpace = SRGBColorSpace
 
       // Load night skybox texture
       const night_skybox = new CubeTextureLoader().load([
@@ -40,7 +40,7 @@ export default function () {
         night_pz,
         night_nz,
       ])
-      night_skybox.encoding = sRGBEncoding
+      night_skybox.colorSpace = SRGBColorSpace
 
       // Set initial skybox
       scene.background = day_skybox

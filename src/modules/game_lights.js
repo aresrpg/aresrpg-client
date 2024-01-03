@@ -57,7 +57,7 @@ export default function () {
     },
     observe({ scene, renderer, signal, get_state, events }) {
       // lights
-      const ambiant_light = new AmbientLight(0xffffff, 1)
+      const ambiant_light = new AmbientLight(0xffffff, 1.5)
 
       const sunlight = new DirectionalLight(0xffffff, 1)
       const moonlight = new DirectionalLight(0x6666ff, 0) // Initially off
@@ -92,7 +92,7 @@ export default function () {
       moonlight.shadow.camera.right = CAMERA_SHADOW_SIZE
       moonlight.shadow.camera.top = CAMERA_SHADOW_SIZE
       moonlight.shadow.camera.bottom = -CAMERA_SHADOW_SIZE
-      moonlight.shadow.bias = -0.001 // This value may need tweaking
+      // moonlight.shadow.bias = -0.001 // This value may need tweaking
 
       moonlight.shadow.camera.updateProjectionMatrix()
       mooncamera_helper.update()
@@ -109,7 +109,7 @@ export default function () {
       scene.add(mooncamera_helper)
 
       // water
-      water.position.y = 15.5
+      water.position.y = 9.5
       water.rotation.x = -Math.PI / 2
 
       scene.add(water)
@@ -205,7 +205,31 @@ export default function () {
             const color = Colors.sunrise.lerp(Colors.noon, sky_elevation / 90)
             sunlight.color = color
             scene.fog.color = color
+            if (moonlight.parent) {
+              scene.remove(moonlight)
+              scene.remove(moonlight.target)
+              scene.remove(moonlight_helper)
+              scene.remove(mooncamera_helper)
+            }
+            if (!sunlight.parent) {
+              scene.add(sunlight)
+              scene.add(sunlight.target)
+              scene.add(sunlight_helper)
+              scene.add(suncamera_helper)
+            }
           } else {
+            if (!moonlight.parent) {
+              scene.add(moonlight)
+              scene.add(moonlight.target)
+              scene.add(moonlight_helper)
+              scene.add(mooncamera_helper)
+            }
+            if (sunlight.parent) {
+              scene.remove(sunlight)
+              scene.remove(sunlight.target)
+              scene.remove(sunlight_helper)
+              scene.remove(suncamera_helper)
+            }
             const color = Colors.sunset.lerp(Colors.night, -sky_elevation / 90)
             sunlight.color = color
             scene.fog.color = color
