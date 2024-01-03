@@ -1,9 +1,7 @@
 import { createNoise2D } from 'simplex-noise'
 import alea from 'alea'
 
-import biomes from './biomes.js'
-
-export function create_fractionnal_brownian(biome, seed) {
+export function create_fractionnal_brownian(seed, biome) {
   const { scale, height, octaves, persistence, lacunarity, exponentiation } =
     biome
 

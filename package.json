@@ -34,7 +34,6 @@
     "n8ao": "^1.7.1",
     "nanoid": "^5.0.4",
     "ndarray": "^1.0.19",
-    "recast-navigation": "^0.16.0",
     "simplex-noise": "^4.0.1",
     "stats.js": "^0.17.0",
     "three": "^0.159.0",

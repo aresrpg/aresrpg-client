@@ -3,10 +3,9 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { AnimationMixer, DefaultLoadingManager } from 'three'
 import { MeshoptDecoder } from 'meshoptimizer'
+import { clone } from 'three/examples/jsm/utils/SkeletonUtils'
 
-const GLTF_LOADER = new GLTFLoader(DefaultLoadingManager).setCrossOrigin(
-  'anonymous',
-)
+const GLTF_LOADER = new GLTFLoader(DefaultLoadingManager)
 const DRACO_LOADER = new DRACOLoader(DefaultLoadingManager)
 const KTX2_LOADER = new KTX2Loader(DefaultLoadingManager)
 
@@ -21,37 +20,43 @@ GLTF_LOADER.setMeshoptDecoder(MeshoptDecoder)
 
 export async function load(
   path,
-  { scale = 1, animations_names = [], envMapIntensity = 1 } = {},
+  { envMapIntensity = 1, mesh_name = 'Model', scale = 1 } = {},
 ) {
   const { scene, animations } = await GLTF_LOADER.loadAsync(path)
-  scene.scale.multiplyScalar(scale)
 
-  scene.traverse(object => {
+  scene.scale.set(scale, scale, scale)
+
+  scene.traverse(child => {
     // @ts-ignore
-    if (object.isMesh) {
-      object.castShadow = true
-      object.receiveShadow = true
+    if (child.isBone) child.visible = false
+
+    // @ts-ignore
+    if (child.isMesh) {
+      child.castShadow = true
+      child.receiveShadow = true
+
       // @ts-ignore
-      Object.assign(object.material, { envMapIntensity })
+      Object.assign(child.material, { envMapIntensity })
     }
   })
 
-  // scene.rotation.x = Math.PI / 2
-
-  return {
-    model: scene,
-    compute_animations(cloned_model) {
-      const clips = {
-        mixer: new AnimationMixer(cloned_model),
-      }
-
-      animations.forEach((animation, index) => {
-        const name = animations_names[index]
-
-        if (name) clips[name] = clips.mixer.clipAction(animation)
-      })
-
-      return clips
-    },
+  return () => {
+    const cloned = clone(scene)
+    return {
+      model: cloned,
+      skinned_mesh: cloned.getObjectByName(mesh_name),
+      compute_animations(model) {
+        const mixer = new AnimationMixer(model)
+        return {
+          mixer,
+          actions: Object.fromEntries(
+            animations.map(animation => [
+              animation.name,
+              mixer.clipAction(animation),
+            ]),
+          ),
+        }
+      },
+    }
   }
 }

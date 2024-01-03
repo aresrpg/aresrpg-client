@@ -22,32 +22,29 @@ export default function (shared) {
         window.innerHeight,
       )
 
+      // n8aopass.configuration.aoRadius = 1
+      // n8aopass.configuration.distanceFalloff = 5.0
+      // n8aopass.configuration.intensity = 5.0
+
       // n8aopass.setDisplayMode('Split AO')
       // n8aopass.configuration.aoSamples = 64
       // n8aopass.configuration.denoiseSamples = 8
       // n8aopass.configuration.denoiseRadius = 6
-      const outlinepass = new OutlinePass(
-        new Vector2(window.innerWidth, window.innerHeight),
-        scene,
-        camera,
-      )
 
-      shared.outline = outlinepass
-
-      outlinepass.edgeThickness = 1
+      shared.outline.edgeThickness = 1
       // outlinepass.overlayMaterial.blendSrc = 1
       // outlinepass.overlayMaterial.blendDst = 1
-      outlinepass.visibleEdgeColor.set('#000000')
-      outlinepass.edgeStrength = 5
-      outlinepass.edgeGlow = 0
+      shared.outline.visibleEdgeColor.set('#000000')
+      shared.outline.edgeStrength = 5
+      shared.outline.edgeGlow = 0
 
-      outlinepass.overlayMaterial.blending = CustomBlending
+      shared.outline.overlayMaterial.blending = CustomBlending
 
       // Add this after the outline pass is created
 
       composer.addPass(n8aopass)
       composer.addPass(smaapass)
-      composer.addPass(outlinepass)
+      composer.addPass(shared.outline)
 
       signal.addEventListener(
         'abort',

@@ -27,15 +27,16 @@ declare namespace Type {
   type Entity = {
     id: string
     title: import('troika-three-text').Text
-    three_body: import('three').Object3D
+    collider: import('three').Object3D
     height: number
     radius: number
     position: import('three').Vector3
     target_position: Position
     segment: import('three').Line3
-    move: (vector: Position) => void
-    rotate: (vector: import('three').Vector3) => void
-    animate: (clip: string, delta: number) => void
+    set_low_priority: (skip: boolean) => void
+    move: (position: Position) => void
+    rotate: (rotation: import('three').Vector3) => void
+    animate: (name: string) => void
     remove: () => void
   }
 
@@ -43,9 +44,6 @@ declare namespace Type {
   type Actions = {
     'action/show_fps': boolean
     'action/target_fps': number
-    'action/game_speed': number
-    'action/show_terrain': boolean
-    'action/show_entities': boolean
     'action/show_terrain_collider': boolean
     'action/show_entities_collider': boolean
     'action/keydown': string
@@ -55,44 +53,8 @@ declare namespace Type {
     'action/select_character': string
     'action/view_distance': number
     'action/far_view_distance': number
-    'action/biome_settings': {
-      scale: number
-      height: number
-      octaves: number
-      persistence: number
-      lacunarity: number
-      exponentiation: number
-      painting: {
-        snow_cover_scale: number
-        snow_cover_threshold: number
-        full_snow_altitude: number
-        min_snow_altitude: number
-        full_snow_cover_threshold: number
-        snow_stone_mix_threshold: number
-        stone_noise_scale: number
-        stone_threshold: number
-        stone_color_noise_threshold: number
-        moisture_scale: number
-        moisture_threshold: number
-        sand_noise_scale: number
-        sand_noise_threshold: number
-        grass_noise_scale: number
-        grass_noise_threshold: number
-        dry_grass_noise_threshold: number
-      }
-    }
     'action/show_chunk_border': boolean
     'action/free_camera': boolean
-    'action/navmesh_settings': {
-      cell_size: number
-      cell_height: number
-      walkable_slope_angle: number
-      walkable_radius: number
-      walkable_climb: number
-      walkable_height: number
-      min_region_area: number
-    }
-    'action/show_navmesh': boolean
   } & Packets
 
   type Events = import('@aresrpg/aresrpg-protocol/src/types').TypedEmitter<

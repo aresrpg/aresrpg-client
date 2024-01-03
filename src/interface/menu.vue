@@ -32,8 +32,13 @@
       i.bx.bx-plus.bx-md
   .menu_create_character(v-if="menu_type === 'CREATE_CHARACTER'")
     .slider
+      img(src="../assets/class/iop.jpg" @click="selected_class_type = 'IOP_MALE'" :class="{ selected: selected_class_type === 'IOP_MALE' }")
+      img(src="../assets/class/iop_f.jpg" @click="selected_class_type = 'IOP_FEMALE'" :class="{ selected: selected_class_type === 'IOP_FEMALE' }")
+      img(src="../assets/class/sram.jpg" @click="selected_class_type = 'SRAM_MALE'" :class="{ selected: selected_class_type === 'SRAM_MALE' }")
+      img(src="../assets/class/sram_f.jpg" @click="selected_class_type = 'SRAM_FEMALE'" :class="{ selected: selected_class_type === 'SRAM_FEMALE' }")
     .desc
     .perso
+      Display(:type="selected_class_type")
     .spells
     vs-input.name(block placeholder="Enter your name" v-model="name" @keyup.enter="create_character")
       template(#message-danger v-if="name_error") {{ name_error }}
@@ -42,20 +47,13 @@
 </template>
 
 <script setup>
-import {
-  inject,
-  onUnmounted,
-  onMounted,
-  ref,
-  watch,
-  watchEffect,
-  computed,
-} from 'vue';
+import { inject, onUnmounted, onMounted, ref, watch, computed } from 'vue';
 
 import logo from '../assets/logo.png';
 import text_logo from '../assets/text_logo.png';
 import pkg from '../../package.json';
-import { VITE_API } from '../env';
+
+import Display from './class_display.vue';
 
 const game = inject('game');
 const state = inject('state');
@@ -66,6 +64,7 @@ const name = ref('');
 const play_button_disabled = ref(false);
 
 const name_error = ref('');
+const selected_class_type = ref('IOP_MALE');
 
 const is_logged = computed(() => !!auth_user?.uuid);
 
@@ -95,8 +94,8 @@ function play() {
 }
 
 function show_characters_menu() {
-  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 1.2, 4]);
-  menu_type.value = 'CHARACTERS';
+  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 3, 4]);
+  menu_type.value = 'CREATE_CHARACTER';
 }
 
 function show_characters_creation() {
@@ -277,7 +276,21 @@ a
       grid-area slider
       place-self stretch
       margin 1em
-      background grey
+      display flex
+      flex-flow row nowrap
+      justify-content space-evenly
+      img
+        object-fit cover
+        width 20%
+        border-radius 6px
+        cursor pointer
+        opacity .5
+        &:hover
+          filter brightness(1.2)
+        &.selected
+          opacity 1
+          filter drop-shadow(1px 2px 3px black)
+
     .desc
       grid-area desc
       place-self stretch
@@ -287,7 +300,6 @@ a
       grid-area perso
       place-self stretch
       margin 1em
-      background grey
     .spells
       grid-area spells
       place-self stretch

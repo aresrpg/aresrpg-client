@@ -1,19 +1,16 @@
 import {
-  AnimationMixer,
-  Box3,
   BoxGeometry,
-  CapsuleGeometry,
+  Group,
   Line3,
   LoopOnce,
   Mesh,
   MeshBasicMaterial,
-  Object3D,
   Quaternion,
   Vector3,
 } from 'three'
-import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { Text } from 'troika-three-text'
 import { createDerivedMaterial } from 'troika-three-utils'
+import { nanoid } from 'nanoid'
 
 import step1 from './assets/sound/step1.ogg'
 import step2 from './assets/sound/step2.ogg'
@@ -22,9 +19,11 @@ import step4 from './assets/sound/step4.ogg'
 import step5 from './assets/sound/step5.ogg'
 import step6 from './assets/sound/step6.ogg'
 import { load } from './utils/load_model.js'
-import iop_male from './models/iop.glb?url'
-
-const FRAME_ANIMATION_SKIP = 3
+import iop_male from './models/iop_male.glb?url'
+import iop_female from './models/iop_female.glb?url'
+import sram_male from './models/sram_male.glb?url'
+import InstancedEntity from './utils/InstancedEntity.js'
+import dispose from './utils/dispose'
 
 const throttle = (action, interval) => {
   let last_time = 0
@@ -92,54 +91,44 @@ const play_step_sound = throttle(() => {
   step_audio.play()
 }, 310)
 
-const Models = {
+// const CHARACTER_ANIMATIONS = [
+//   'IDLE',
+//   'RUN',
+//   'JUMP',
+//   'JUMP_RUN',
+//   'FALL',
+//   'DEATH',
+//   'ATTACK_CAC',
+//   'SPELL_BUFF',
+//   'SPELL_TARGET',
+//   'DANCE',
+//   'SIT',
+//   'WALK',
+// ]
+
+export const Models = {
   iop_male: await load(iop_male, {
-    scale: 0.45,
-    animations_names: Array.from({
-      length: 16,
-      0: 'AFK',
-      1: 'ATTACK_1',
-      2: 'ATTACK_2',
-      3: 'ATTACK_3',
-      4: 'DANCE',
-      5: 'DEATH',
-      6: 'ROLL',
-      7: 'FALL',
-      8: 'HIT',
-      9: 'ATTACK_HEAVY',
-      10: 'ATTACK_HEAVY_HOLD',
-      11: 'IDLE',
-      12: 'JUMP',
-      13: 'LAND',
-      14: 'RUN',
-    }),
     envMapIntensity: 0.5,
   }),
-}
-
-function fade_to_animation(from, to, duration = 0.3) {
-  if (from !== to) {
-    from?.fadeOut(duration)
-    to.reset().fadeIn(duration).play()
-  }
+  iop_female: await load(iop_female, {
+    envMapIntensity: 0.5,
+    scale: 1.2,
+  }),
+  sram_male: await load(sram_male, {
+    envMapIntensity: 0.5,
+    scale: 1.2,
+  }),
 }
 
 /**
  *
  * @param {object} param0
  * @param {import("three").Scene} param0.scene
- * @param {object} param0.shared
  */
-export default function create_pools({ scene, shared }) {
-  function create_pool(
-    { model, compute_animations },
-    { count, height, radius },
-  ) {
-    const data = Array.from({ length: count }).map(() => {
-      const cloned_body = clone(model)
-      const body = new Object3D()
-
-      const collider_geometry = new CapsuleGeometry(radius, height / 2, 2)
+export default function create_pools({ scene }) {
+  function instanciate(clone_model, { height, radius, name }) {
+    function create_collider(id) {
+      const collider_geometry = new BoxGeometry(radius, height, radius, 2)
       const collider_mesh = new Mesh(
         collider_geometry,
         new MeshBasicMaterial({
@@ -150,52 +139,82 @@ export default function create_pools({ scene, shared }) {
       )
       collider_mesh.castShadow = true
       collider_mesh.receiveShadow = true
+      collider_mesh.name = `entity:collider:${id}`
+      collider_mesh.position.y -= height / 2 - 0.1
 
-      cloned_body.name = 'model'
-      collider_mesh.name = 'collider'
+      scene.add(collider_mesh)
 
-      cloned_body.position.y -= height * 0.86
-      cloned_body.rotation.y = Math.PI
-      collider_mesh.position.y -= height * 0.3
+      return collider_mesh
+    }
 
-      body.add(cloned_body)
-      body.add(collider_mesh)
+    /**
+     *
+     * @param {InstancedEntity} existing_instance
+     */
+    function create_instance(existing_instance) {
+      const { model, skinned_mesh, compute_animations } = clone_model()
+      const { mixer, actions } = compute_animations(model)
 
-      // pooled entity is not visible by default
-      // @ts-ignore
-      body.collider = collider_mesh
-      // @ts-ignore
-      body.model = cloned_body
+      const entity =
+        existing_instance?.expand({
+          skinned_mesh,
+          actions,
+          mixer,
+        }) ||
+        new InstancedEntity({
+          skinned_mesh,
+          actions,
+          mixer,
+          capacity: 30,
+        })
 
-      body.visible = false
+      const body = new Group()
+
+      body.name = `entity:body:${name}`
 
       scene.add(body)
 
-      return body
-    })
+      body.add(model)
+      body.add(entity)
+
+      entity.name = `instanced:${name}`
+
+      return {
+        body,
+        entity,
+        actions,
+        mixer,
+      }
+    }
+
+    const instance = create_instance(null)
+
+    if (instance.actions.JUMP) instance.actions.JUMP.setLoop(LoopOnce, 1)
+
+    instance.actions.IDLE.play()
 
     return {
-      data,
-      /** @type {(options?: {  fixed_title_aspect: boolean }) => Type.Entity} */
-      get(
-        { fixed_title_aspect } = {
-          fixed_title_aspect: false,
-        },
-      ) {
-        const body = data.find(object => !object.visible)
+      entity: () => instance.entity,
+      /** @type {(options: {  fixed_title_aspect?: boolean; id?: string; collider?: boolean  } = {}) => Type.Entity} */
+      get({ id = nanoid(), fixed_title_aspect, collider = false } = {}) {
+        if (!id) throw new Error('id is required')
 
-        if (!body) throw new Error('No more models available')
+        const collider_mesh = collider ? create_collider() : null
 
-        body.visible = true
+        const success = instance.entity.add_entity(id)
 
-        // @ts-ignore
-        const animations = compute_animations(body.model)
+        // !FIXME: This doesn't work for whatever reason..
+        if (!success) {
+          console.log('failed to add', id)
+          scene.remove(instance.body)
 
-        if (animations.JUMP) animations.JUMP.setLoop(LoopOnce, 1)
+          dispose(instance.body)
 
-        let current_animation = animations.IDLE
+          Object.assign(instance, create_instance(instance.entity))
 
-        current_animation.reset().play()
+          console.log('adding', id)
+          instance.entity.add_entity(id)
+        }
 
         const title = new Text()
 
@@ -210,33 +229,36 @@ export default function create_pools({ scene, shared }) {
 
         scene.add(title)
 
-        shared.outline.selectedObjects.push(body)
+        instance.entity.set_animation(id, 'IDLE')
 
-        let animation_frame_skipped = 0
+        const current_position = new Vector3()
+        let current_animation = 'IDLE'
+
+        // shared.outline.selectedObjects.push(body)
 
         return {
-          id: '',
+          id,
           title,
-          three_body: body,
+          collider: collider_mesh,
           height,
           radius,
-          segment: new Line3(new Vector3(), new Vector3(0, -height / 2, 0)),
+          segment: new Line3(new Vector3(), new Vector3(0, height / 2, 0)),
           move(position) {
             // @ts-ignore
-            body.position.copy(position)
-            title.position.copy(position).add(new Vector3(0, height / 2, 0))
-          },
-          remove() {
-            scene.remove(title)
-
-            shared.outline.selectedObjects.splice(
-              shared.outline.selectedObjects.indexOf(body),
-              1,
-            )
-
-            title.geometry.dispose()
-
-            body.visible = false
+            if (current_position.distanceTo(position) < 0.01) return
+            instance.entity.set_position(id, {
+              ...position,
+              y: position.y - height / 2,
+            })
+            // @ts-ignore
+            title.position.copy({
+              ...position,
+              y: position.y + height,
+            })
+            // @ts-ignore
+            collider_mesh?.position.copy(position)
+            // @ts-ignore
+            current_position.copy(position)
           },
           rotate(movement) {
             // Normalize the movement vector in the horizontal plane (x-z)
@@ -246,25 +268,37 @@ export default function create_pools({ scene, shared }) {
               MODEL_FORWARD,
               flat_movement,
             )
-            body.quaternion.slerp(quaternion, 0.2)
+            instance.entity.set_quaternion(id, quaternion)
           },
-          animate(clip, delta) {
-            if (animation_frame_skipped++ < FRAME_ANIMATION_SKIP) return
-            animation_frame_skipped = 0
+          remove() {
+            scene.remove(title)
 
-            animations.mixer.update(delta)
+            // shared.outline.selectedObjects.splice(
+            //   shared.outline.selectedObjects.indexOf(body),
+            //   1,
+            // )
 
-            if (clip === 'RUN') play_step_sound()
-            if (clip === 'IDLE' && current_animation === animations.DANCE)
-              return
+            title.geometry.dispose()
 
-            const animation = animations[clip]
-            if (animation && animation !== current_animation) {
-              fade_to_animation(current_animation, animation)
-              current_animation = animation
+            // @ts-ignore
+            collider_mesh?.geometry.dispose()
+            // @ts-ignore
+            collider_mesh?.body.collider?.material.dispose()
+
+            instance.entity.remove_entity(id)
+          },
+          set_low_priority(priority) {
+            instance.entity.set_low_priority(id, priority)
+          },
+          animate(name) {
+            // if (clip === 'RUN') play_step_sound()
+            if (name === 'IDLE' && current_animation === 'DANCE') return
+            if (name !== current_animation) {
+              instance.entity.set_animation(id, name)
+              current_animation = name
             }
           },
-          position: body.position,
+          position: current_position,
           target_position: null,
         }
       },
@@ -272,10 +306,20 @@ export default function create_pools({ scene, shared }) {
   }
 
   return {
-    iop_male: create_pool(Models.iop_male, {
-      count: 10,
-      height: 1.9,
-      radius: 0.7,
+    iop_male: instanciate(Models.iop_male, {
+      height: 1.8,
+      radius: 0.9,
+      name: 'iop_male',
+    }),
+    iop_female: instanciate(Models.iop_female, {
+      height: 1.8,
+      radius: 0.9,
+      name: 'iop_female',
+    }),
+    sram_male: instanciate(Models.sram_male, {
+      height: 1.8,
+      radius: 0.9,
+      name: 'sram_male',
     }),
   }
 }

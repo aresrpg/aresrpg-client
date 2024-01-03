@@ -1,33 +1,29 @@
-import { on } from 'events'
 // @ts-ignore
 import { setInterval } from 'timers/promises'
 
 import { aiter } from 'iterator-helper'
-import {
-  Box3,
-  Line3,
-  MathUtils,
-  Matrix4,
-  Quaternion,
-  Spherical,
-  Vector3,
-} from 'three'
+import { ArrowHelper, Object3D, Vector3 } from 'three'
 import { lerp } from 'three/src/math/MathUtils.js'
 import { to_chunk_position } from '@aresrpg/aresrpg-protocol'
 
 import { GRAVITY } from '../game.js'
 import { abortable } from '../utils/iterator'
 import { compute_animation_state } from '../utils/animation.js'
-import { compute_movements, compute_sensors } from '../utils/physics.js'
+import {
+  compute_movements,
+  compute_sensors,
+  distance_from_ground,
+} from '../utils/physics.js'
 
-const SPEED = 6
+const SPEED = 10
+const WALK_SPEED = 6
 const JUMP_FORCE = 10
-const CONTROLLER_OFFSET = 0.01
 const ASCENT_GRAVITY_FACTOR = 3
 const APEX_GRAVITY_FACTOR = 0.3
 const DESCENT_GRAVITY_FACTOR = 5
 const JUMP_FORWARD_IMPULSE = 3
 const JUMP_COOLDWON = 0.1 // one jump every 100ms
+const PHYSIC_STEPS = 3
 
 const jump_states = {
   ASCENT: 'ASCENT',
@@ -44,20 +40,23 @@ export default function (shared) {
   let jump_cooldown = 0
   let on_ground = false
   let is_dancing = false
+  let is_walking = false
   let chunks_loaded = false
+
+  let last_dance = 0
+
+  const dummy = new Object3D()
 
   return {
     name: 'player_movements',
     tick(
-      { inputs, player, world: { heightfield } },
-      { camera, send_packet, events },
+      { inputs, player, world: { heightfield, seed } },
+      { camera, send_packet, events, scene },
       delta,
     ) {
       if (!player) return
 
-      const { position } = player
-
-      const origin = position.clone()
+      const origin = player.position.clone()
 
       const camera_forward = new Vector3(0, 0, -1)
         .applyQuaternion(camera.quaternion)
@@ -83,10 +82,10 @@ export default function (shared) {
 
       // Avoid falling to hell
       // TODO: tp to nether if falling to hell
-      if (position.y <= -30) {
+      if (origin.y <= -30) {
         velocity.setScalar(0)
-        const { x, z } = position
-        player.move(new Vector3(position.x, heightfield(x, z) + 5, position.z))
+        const { x, z } = origin
+        player.move(new Vector3(origin.x, heightfield(x, z) + 5, origin.z))
         return
       }
 
@@ -97,8 +96,10 @@ export default function (shared) {
       if (inputs.right) movement.add(camera_right)
       if (inputs.left) movement.sub(camera_right)
 
+      const speed = inputs.walk ? WALK_SPEED : SPEED
+
       // normalize sideways movement
-      if (movement.length()) movement.normalize().multiplyScalar(SPEED * delta)
+      if (movement.length()) movement.normalize().multiplyScalar(speed * delta)
 
       // Apply jump force
       if (on_ground) {
@@ -119,6 +120,7 @@ export default function (shared) {
           on_ground = false
 
           send_packet('packet/entityAction', { id: '', action: 'JUMP' })
+          is_walking = false
         } else {
           jump_state = jump_states.NONE
 
@@ -156,72 +158,101 @@ export default function (shared) {
           else velocity.y -= GRAVITY * delta
       }
 
-      movement.addScaledVector(velocity, delta)
-
-      player.move(position.clone().add(movement))
-
-      player.three_body.updateMatrixWorld()
-
-      const terrain = shared.get_chunk_collider(
-        to_chunk_position(position.clone().add(movement).floor()),
-      )
-
-      if (!terrain) return
-
-      on_ground = compute_movements({
-        player,
-        terrain,
-        character: {
-          capsule_radius: player.radius,
-          capsule_segment: player.segment,
-        },
-        delta,
-        velocity,
-        objects: shared.static_objects,
+      const terrain_collider = shared.get_chunk_collider({
+        ...to_chunk_position(origin.clone().add(movement).floor()),
+        seed,
       })
+
+      for (let step = 0; step < PHYSIC_STEPS; step++) {
+        const scaled_delta = delta / PHYSIC_STEPS
+        movement.addScaledVector(velocity, scaled_delta)
+        dummy.position.copy(origin).add(movement)
+        dummy.updateMatrixWorld()
+
+        if (!terrain_collider) {
+          return
+        }
+
+        // I don't like having side effects in an outter function but I'm unable to make bvh works without it
+        on_ground = compute_movements({
+          dummy,
+          terrain_collider,
+          character: {
+            capsule_radius: player.radius,
+            capsule_segment: player.segment,
+          },
+          delta,
+          velocity,
+          objects: shared.static_objects,
+        })
+
+        player.move(dummy.position)
+      }
 
       const is_moving_horizontally =
         inputs.forward || inputs.backward || inputs.right || inputs.left
 
-      if (inputs.dance && !is_dancing) {
+      if (inputs.dance && !is_dancing && Date.now() - last_dance > 1000) {
         is_dancing = true
+        last_dance = Date.now()
         send_packet('packet/entityAction', { id: '', action: 'DANCE' })
       }
 
       if (is_moving_horizontally) {
-        player.rotate(movement)
         is_dancing = false
+        player.rotate(movement)
+
+        if (on_ground) {
+          if (inputs.walk && !is_walking) {
+            is_walking = true
+            send_packet('packet/entityAction', { id: '', action: 'WALK' })
+          }
+
+          if (!inputs.walk && is_walking) {
+            is_walking = false
+            send_packet('packet/entityAction', { id: '', action: 'RUN' })
+          }
+        }
       }
 
+      const ground_distance = distance_from_ground(
+        {
+          position: origin,
+          height: player.height,
+        },
+        scene,
+      )
+
       const animation_name = compute_animation_state({
-        is_on_ground: on_ground,
+        is_on_ground: ground_distance < 5,
         is_moving_horizontally,
         action:
           jump_state === jump_states.ASCENT
             ? 'JUMP'
-            : inputs.dance
-              ? 'DANCE'
-              : null,
+            : inputs.walk && is_moving_horizontally
+              ? 'WALK'
+              : inputs.dance
+                ? 'DANCE'
+                : null,
       })
 
-      if (is_moving_horizontally || !on_ground)
-        player.animate(animation_name, delta)
-      else player.animate(inputs.dance ? 'DANCE' : 'IDLE', delta)
+      if (is_moving_horizontally || !on_ground) player.animate(animation_name)
+      else player.animate(inputs.dance ? 'DANCE' : 'IDLE')
 
       const last_chunk = to_chunk_position(origin)
-      const current_chunk = to_chunk_position(player.position)
+      const current_chunk = to_chunk_position(dummy.position)
 
       if (last_chunk.x !== current_chunk.x || last_chunk.z !== current_chunk.z)
         events.emit('CHANGE_CHUNK', current_chunk)
 
-      compute_sensors({
-        player,
-        character: {
-          capsule_radius: player.radius,
-          capsule_segment: player.segment,
-        },
-        sensors: shared.get_sensors(current_chunk),
-      })
+      // compute_sensors({
+      //   player,
+      //   character: {
+      //     capsule_radius: player.radius,
+      //     capsule_segment: player.segment,
+      //   },
+      //   sensors: shared.get_sensors(current_chunk),
+      // })
     },
     reduce(state, { type, payload }) {
       if (type === 'packet/playerPosition') {
@@ -235,19 +266,21 @@ export default function (shared) {
       }
       return state
     },
-    observe({ events, signal, dispatch, get_state, send_packet }) {
+    observe({ events, signal, dispatch, get_state, send_packet, scene }) {
       aiter(abortable(setInterval(50, null, { signal }))).reduce(
         last_position => {
           const { player } = get_state()
 
           if (!player) return last_position
 
+          /** @type {Vector3} */
+          // @ts-ignore
           const { position } = player
 
           // round position with 2 decimals
-          const x = Math.round(position.x * 100) / 100
-          const y = Math.round(position.y * 100) / 100
-          const z = Math.round(position.z * 100) / 100
+          const x = Math.round(position.x * 1000) / 1000
+          const y = Math.round(position.y * 1000) / 1000
+          const z = Math.round(position.z * 1000) / 1000
 
           if (
             last_position.x !== x ||
@@ -262,9 +295,12 @@ export default function (shared) {
         { x: 0, y: 0, z: 0 },
       )
 
-      events.on('CHUNKS_LOADED', () => {
-        if (!chunks_loaded) chunks_loaded = true
+      events.once('CHUNKS_LOADED', () => {
+        chunks_loaded = true
       })
+
+      // notify the server that we are ready to receive chunks and more
+      send_packet('packet/joinGameReady', {})
     },
   }
 }

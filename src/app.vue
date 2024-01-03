@@ -14,13 +14,14 @@ import {
   watchEffect,
 } from 'vue';
 import { VsLoadingFn } from 'vuesax-alpha';
+import { useTitle } from '@vueuse/core';
 
 import Game from './game.vue';
 import { VITE_API } from './env.js';
 
 const name = 'app';
 const loading = ref(0);
-
+const title = useTitle();
 const auth_user = reactive({});
 
 provide('loading', loading);
@@ -62,10 +63,22 @@ function on_assets_loading() {
 
 onMounted(() => {
   loading.value++;
-  request(`{ me { uuid } }`)
+  request(
+    `{ me { uuid auth { discord { username } minecraft { username } } } }`,
+  )
     .then(res => res.json())
     .then(({ data }) => {
-      if (data) Object.assign(auth_user, data.me);
+      if (data) {
+        Object.assign(auth_user, data.me);
+        const {
+          me: {
+            auth: { discord, minecraft },
+          },
+        } = data;
+        const name =
+          discord?.username || minecraft?.username || 'Name not found';
+        title.value = `Ares (${name})`;
+      }
     })
     .finally(() => {
       loading.value--;
