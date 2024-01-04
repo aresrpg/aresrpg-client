@@ -184,6 +184,12 @@ export default function create_pools({ scene }) {
         entity,
         actions,
         mixer,
+        dispose() {
+          scene.remove(body)
+          entity.dispose()
+          dispose(body)
+          dispose(model)
+        },
       }
     }
 
@@ -194,7 +200,7 @@ export default function create_pools({ scene }) {
     instance.actions.IDLE.play()
 
     return {
-      entity: () => instance.entity,
+      instanced_entity: instance,
       /** @type {(options: {  fixed_title_aspect?: boolean; id?: string; collider?: boolean  } = {}) => Type.Entity} */
       get({ id = nanoid(), fixed_title_aspect, collider = false } = {}) {
         if (!id) throw new Error('id is required')
@@ -205,14 +211,10 @@ export default function create_pools({ scene }) {
 
         // !FIXME: This doesn't work for whatever reason..
         if (!success) {
-          console.log('failed to add', id)
-          scene.remove(instance.body)
-
-          dispose(instance.body)
+          instance.dispose()
 
           Object.assign(instance, create_instance(instance.entity))
 
-          console.log('adding', id)
           instance.entity.add_entity(id)
         }
 
@@ -280,10 +282,8 @@ export default function create_pools({ scene }) {
 
             title.geometry.dispose()
 
-            // @ts-ignore
             collider_mesh?.geometry.dispose()
-            // @ts-ignore
-            collider_mesh?.body.collider?.material.dispose()
+            collider_mesh?.material.dispose()
 
             instance.entity.remove_entity(id)
           },
@@ -305,7 +305,7 @@ export default function create_pools({ scene }) {
     }
   }
 
-  return {
+  const instances = {
     iop_male: instanciate(Models.iop_male, {
       height: 1.8,
       radius: 0.9,
@@ -321,5 +321,14 @@ export default function create_pools({ scene }) {
       radius: 0.9,
       name: 'sram_male',
     }),
+  }
+
+  return {
+    dispose() {
+      instances.iop_male.instanced_entity.dispose()
+      instances.iop_female.instanced_entity.dispose()
+      instances.sram_male.instanced_entity.dispose()
+    },
+    ...instances,
   }
 }
