@@ -1,59 +1,18 @@
-<template lang="pug">
-.menu
-  nav
-    img.logo(:src="logo")
-    .version build {{ pkg.version }}
-  .infos(v-if="menu_type === 'PLAY'")
-    vs-alert(color="#3498DB" type="gradient")
-      | We moved away from Minecraft as it was too limited for our needs. We are now using our own game engine, which allows us to do much more. We are still in early development, but we are working hard to bring you the best experience possible. Stay tuned!
-      | #[b If you own an early access key, you can already connect to the game and follow the development.]
-      template(#title) AresRPG is now a standalone game!
-
-  .menu_play(v-if="menu_type === 'PLAY'")
-    img.logo(:src="text_logo")
-    .btns
-      .ares_btn(v-if="!is_logged" @click="open_app" ) Login
-      .ares_btn.green(v-else @click="play" :class="{ disabled: play_button_disabled}") Play
-      .sub
-        .discord.ares_btn(@click="open_discord") Discord
-        .twitter.ares_btn(@click="open_twitter") Twitter
-  .menu_characters(v-if="menu_type === 'CHARACTERS'")
-    .character(v-for="character in state.characters" @click="() => select_character(character)")
-      .skin
-      .grad
-      .name {{ character.name }}
-      .level Lvl {{ character.level }}
-    .character_new(
-        v-if="state.characters?.length < state.characters_limit"
-        @click="show_characters_creation"
-      )
-      .skin
-      .grad
-      i.bx.bx-plus.bx-md
-  .menu_create_character(v-if="menu_type === 'CREATE_CHARACTER'")
-    .slider
-      img(src="../assets/class/iop.jpg" @click="selected_class_type = 'IOP_MALE'" :class="{ selected: selected_class_type === 'IOP_MALE' }")
-      img(src="../assets/class/iop_f.jpg" @click="selected_class_type = 'IOP_FEMALE'" :class="{ selected: selected_class_type === 'IOP_FEMALE' }")
-      img(src="../assets/class/sram.jpg" @click="selected_class_type = 'SRAM_MALE'" :class="{ selected: selected_class_type === 'SRAM_MALE' }")
-      img(src="../assets/class/sram_f.jpg" @click="selected_class_type = 'SRAM_FEMALE'" :class="{ selected: selected_class_type === 'SRAM_FEMALE' }")
-    .desc
-    .perso
-      Display(:type="selected_class_type")
-    .spells
-    vs-input.name(block placeholder="Enter your name" v-model="name" @keyup.enter="create_character")
-      template(#message-danger v-if="name_error") {{ name_error }}
-    vs-button.back(type="shadow" color="#2ECC71" @click="show_characters_menu") Cancel
-    vs-button.play(:class=`{ disabled: name_error || name_too_short || name_too_long || name_invalid }` type="shadow" color="#2ECC71" @click="create_character") Create
-</template>
-
 <script setup>
 import { inject, onUnmounted, onMounted, ref, watch, computed } from 'vue';
+import Spells from '@aresrpg/aresrpg-protocol/src/spells.json';
 
 import logo from '../assets/logo.png';
 import text_logo from '../assets/text_logo.png';
 import pkg from '../../package.json';
+import iop from '../assets/class/iop.jpg';
+import iop_f from '../assets/class/iop_f.jpg';
+import sram from '../assets/class/sram.jpg';
+import sram_f from '../assets/class/sram_f.jpg';
+import xelor from '../assets/class/xelor.jpg';
 
-import Display from './class_display.vue';
+import Display from './menu_class_display.vue';
+import SpellDisplay from './menu_spell_display.vue';
 
 const game = inject('game');
 const state = inject('state');
@@ -66,6 +25,57 @@ const play_button_disabled = ref(false);
 const name_error = ref('');
 const selected_class_type = ref('IOP_MALE');
 
+const characters = [
+  {
+    type: 'IOP_MALE',
+    class: 'iop',
+    image: iop,
+    name: 'Iop (male)',
+    desc: "Knights of the realm, the Iop's are as brave as they are brawn. With a penchant for charging headfirst into battle, their formidable strength is an asset in close combat. Though not the most strategic fighters, an Iop's presence on the battlefield can change the tide with a swing of their mighty sword.",
+  },
+  {
+    type: 'IOP_FEMALE',
+    class: 'iop',
+    image: iop_f,
+    name: 'Iop (female)',
+    desc: 'The female Iop stands tall among her peers, blending grace with overwhelming power. Her sword, a whirlwind of steel, carves through enemies with precision and might. While often underestimated, her strategic prowess and indomitable courage make her a true force to be reckoned with.',
+  },
+  {
+    type: 'SRAM_MALE',
+    class: 'sram',
+    image: sram,
+    name: 'Sram (male)',
+    desc: "Emerging from the shadows, the male Sram is the embodiment of death's guile. A master of stealth and deceit, he can vanish from sight to strike when least expected. With the power to summon skeletal warriors and lay cunning traps, he ensures that the battlefield is always in his favor.",
+  },
+  {
+    type: 'SRAM_FEMALE',
+    class: 'sram',
+    image: sram_f,
+    name: 'Sram (female)',
+    desc: 'The female Sram, a specter of stealth and subterfuge, wields the powers of invisibility and necromancy with sinister finesse. Her traps ensnare the unwary, and her summoned minions rise from the earth to do her bidding. In the art of silent assassination, she has no equal.',
+  },
+  {
+    type: 'XELOR',
+    image: xelor,
+    disabled: true,
+    desc: 'Xelors are the manipulators of time itself, capable of bending moments to their will. They can slow down foes, hasten allies, and, if legends are to be believed, reverse the flow of battle. Their command over temporal magic makes them enigmatic and unpredictable adversaries.',
+  },
+  { type: 'XELOR', image: xelor, disabled: true },
+  { type: 'XELOR', image: xelor, disabled: true },
+  { type: 'XELOR', image: xelor, disabled: true },
+  { type: 'XELOR', image: xelor, disabled: true },
+];
+
+const selected_class_data = computed(() => {
+  const character = characters.find(
+    character => character.type === selected_class_type.value,
+  );
+
+  return {
+    ...character,
+    spells: Spells[character.class],
+  };
+});
 const is_logged = computed(() => !!auth_user?.uuid);
 
 const menu_type = ref(ws_status.value === 'OPEN' ? 'CHARACTERS' : 'PLAY');
@@ -95,7 +105,7 @@ function play() {
 
 function show_characters_menu() {
   game.value.events.emit('MOVE_MENU_CAMERA', [-8, 3, 4]);
-  menu_type.value = 'CREATE_CHARACTER';
+  menu_type.value = 'CHARACTERS';
 }
 
 function show_characters_creation() {
@@ -153,6 +163,58 @@ onUnmounted(() => {
   game.value.events.off('packet/error', on_server_error);
 });
 </script>
+
+<template lang="pug">
+.menu
+  nav
+    img.logo(:src="logo")
+    .version build {{ pkg.version }}
+  .infos(v-if="menu_type === 'PLAY'")
+    vs-alert(color="#3498DB" type="gradient")
+      | We moved away from Minecraft as it was too limited for our needs. We are now using our own game engine, which allows us to do much more. We are still in early development, but we are working hard to bring you the best experience possible. Stay tuned!
+      | #[b If you own an early access key, you can already connect to the game and follow the development.]
+      template(#title) AresRPG is now a standalone game!
+
+  .menu_play(v-if="menu_type === 'PLAY'")
+    img.logo(:src="text_logo")
+    .btns
+      .ares_btn(v-if="!is_logged" @click="open_app" ) Login
+      .ares_btn.green(v-else @click="play" :class="{ disabled: play_button_disabled}") Play
+      .sub
+        .discord.ares_btn(@click="open_discord") Discord
+        .twitter.ares_btn(@click="open_twitter") Twitter
+  .menu_characters(v-if="menu_type === 'CHARACTERS'")
+    .character(v-for="character in state.characters" @click="() => select_character(character)")
+      .skin
+      .grad
+      .name {{ character.name }}
+      .level Lvl {{ character.level }}
+    .character_new(
+        v-if="state.characters?.length < state.characters_limit"
+        @click="show_characters_creation"
+      )
+      .skin
+      .grad
+      i.bx.bx-plus.bx-md
+  .menu_create_character(v-if="menu_type === 'CREATE_CHARACTER'")
+    .class_name {{ selected_class_data.name }}
+    .slider
+      .character(
+        v-for="character in characters"
+        :style="{ background: `url(${character.image}) center / cover` }"
+        @click="() => selected_class_type = character.type"
+        :class="{ selected: selected_class_type === character.type, disabled: character.disabled }"
+      )
+    .desc {{ selected_class_data.desc }}
+    .perso
+      Display(:type="selected_class_type")
+    .spells
+      SpellDisplay(:spells="selected_class_data.spells")
+    vs-input.name(block placeholder="Enter your name" v-model="name" @keyup.enter="create_character")
+      template(#message-danger v-if="name_error") {{ name_error }}
+    vs-button.back(type="shadow" color="#2ECC71" @click="show_characters_menu") Cancel
+    vs-button.play(:class=`{ disabled: name_error || name_too_short || name_too_long || name_invalid }` type="shadow" color="#2ECC71" @click="create_character") Create
+</template>
 
 <style lang="stylus" scoped>
 .ares_btn.green
@@ -269,33 +331,81 @@ a
     border-radius 12px
     overflow hidden
     place-items center center
-    grid "slider slider slider" 4fr "desc perso spells" 4fr "back name play" 1fr / 1fr 1fr 1fr
+    grid "title title title" 50px "slider slider slider" 4fr "desc perso spells" 4fr "back name play" 1fr / 1fr 1fr 1fr
     >*
       color #eeeeee
+    .class_name
+      grid-area title
+      font-size 1.5em
+      text-align center
+      font-weight 900
+      text-shadow 1px 2px 3px black
+      text-transform uppercase
+      place-self end center
     .slider
       grid-area slider
       place-self stretch
       margin 1em
       display flex
       flex-flow row nowrap
-      justify-content space-evenly
-      img
-        object-fit cover
-        width 20%
-        border-radius 6px
+      justify-content center
+      padding 0 5%
+      .character
+        border-bottom 3px solid black
+        width 150px // adjust if necessary to fill the container width
+        max-height 500px
         cursor pointer
         opacity .5
+        position relative // For pseudo-element positioning
+        // Adjust the clip-path to cover the gap; tweak the percentages as necessary
+        clip-path polygon(40% 0, 100% 0, 65% 100%, 5% 100%)
+        margin-left -60px
+        filter drop-shadow(3px 1px 1px black)
+        &::after
+          content ''
+          position absolute
+          top 0
+          right 0
+          width 36%
+          height 100%
+          background white
+          z-index 10
+          clip-path polygon(90% 0, 100% 0, 65% 100%, 5% 100%)
         &:hover
           filter brightness(1.2)
         &.selected
           opacity 1
-          filter drop-shadow(1px 2px 3px black)
+          // filter drop-shadow(1px 2px 3px black)
+        &.disabled
+          filter grayscale(100%)
+          opacity .2
+          cursor default
+        &:first-child
+          margin-left 0
+          border-top-left-radius 6px
+          border-bottom-left-radius 6px
+          clip-path polygon(0 0, 100% 0, 65% 100%, 0 100%)
+        &:last-child
+          border-top-right-radius 6px
+          border-bottom-right-radius 6px
+          clip-path polygon(40% 0, 100% 0, 100% 100%, 5% 100%)
+          &::after
+            display none
 
     .desc
       grid-area desc
-      place-self stretch
       margin 1em 3em
-      background grey
+      padding 1em
+      place-self stretch
+      background rgba(0,0,0,0.5)
+      border 1px solid #8b7355 // A border color that fits the game's aesthetic
+      box-shadow 0 4px 8px rgba(0, 0, 0, 0.1) // Soft shadow for depth
+      color #E0E0E0 // Light text for readability
+      font-size 1.2em
+      line-height 1.5
+      overflow-y auto // Allows scrolling if the content is too long
+      border-radius 6px // Slight rounding of corners
+
     .perso
       grid-area perso
       place-self stretch
@@ -304,7 +414,10 @@ a
       grid-area spells
       place-self stretch
       margin 1em 3em
-      background grey
+      background rgba(0,0,0,0.2)
+      border 1px solid #8b7355 // A border color that fits the game's aesthetic
+      border-radius 6px // Slight rounding of corners
+
     .name
       grid-area name
       height 50px

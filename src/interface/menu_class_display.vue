@@ -11,6 +11,7 @@ import {
 } from 'three';
 
 import create_pool from '../pool.js';
+import dispose from '../utils/dispose.js';
 
 const scene_div = ref(null);
 const canvas = ref(null);
@@ -19,11 +20,16 @@ const running = ref(false);
 
 const props = defineProps(['type']);
 
-let pool = null;
 let iop = null;
 let sram = null;
 let iop_female = null;
 const sram_female = null;
+
+let scene = null;
+let pool = null;
+let renderer = null;
+const light = new DirectionalLight(0xffffff, 2);
+const ambient = new AmbientLight(0xffffff, 1);
 
 function reset_classes() {
   iop?.remove();
@@ -72,19 +78,19 @@ function display_classe(type) {
 watch(props, ({ type }) => display_classe(type), { immediate: true });
 
 onMounted(() => {
-  const width = canvas.value.clientWidth;
-  const height = canvas.value.clientHeight;
-  const scene = new Scene();
+  const width = canvas.value?.clientWidth;
+  const height = canvas.value?.clientHeight;
   const camera = new PerspectiveCamera(75, width / height, 0.1, 1000);
+
+  scene = new Scene();
+  pool = create_pool({ scene });
 
   scene.userData.element = scene_div.value;
   scene.userData.camera = camera;
   // scene.background = new Color(0x999999);
   scene.background = null;
 
-  const light = new DirectionalLight(0xffffff, 2);
-  const ambient = new AmbientLight(0xffffff, 1);
-  const renderer = new WebGLRenderer({
+  renderer = new WebGLRenderer({
     canvas: canvas.value,
     // antialias: true,
     alpha: true,
@@ -94,8 +100,6 @@ onMounted(() => {
   renderer.setClearColor(0xffffff, 0);
   // renderer.setClearColor(0xffffff, 1);
   renderer.setPixelRatio(window.devicePixelRatio);
-
-  pool = create_pool({ scene });
 
   renderer.setSize(width, height, false);
 
@@ -117,7 +121,10 @@ onMounted(() => {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
 
-    Object.values(pool).forEach(({ entity }) => entity().tick(delta));
+    Object.values(pool).forEach(value => {
+      if (typeof value === 'function') return;
+      value.instanced_entity.entity.tick(delta);
+    });
     renderer.render(scene, camera);
   }
 
@@ -127,6 +134,15 @@ onMounted(() => {
 
 onUnmounted(() => {
   running.value = false;
+  if (scene) {
+    scene.remove(ambient);
+    scene.remove(light);
+
+    pool?.dispose();
+    renderer?.dispose();
+
+    dispose(scene);
+  }
 });
 </script>
 
