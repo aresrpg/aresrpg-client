@@ -12,29 +12,13 @@ import { Text } from 'troika-three-text'
 import { createDerivedMaterial } from 'troika-three-utils'
 import { nanoid } from 'nanoid'
 
-import step1 from './assets/sound/step1.ogg'
-import step2 from './assets/sound/step2.ogg'
-import step3 from './assets/sound/step3.ogg'
-import step4 from './assets/sound/step4.ogg'
-import step5 from './assets/sound/step5.ogg'
-import step6 from './assets/sound/step6.ogg'
 import { load } from './utils/load_model.js'
 import iop_male from './models/iop_male.glb?url'
 import iop_female from './models/iop_female.glb?url'
 import sram_male from './models/sram_male.glb?url'
+import sram_female from './models/sram_female.glb?url'
 import InstancedEntity from './utils/InstancedEntity.js'
 import dispose from './utils/dispose'
-
-const throttle = (action, interval) => {
-  let last_time = 0
-  return (...args) => {
-    const now = Date.now()
-    if (now - last_time >= interval) {
-      last_time = now
-      action(...args)
-    }
-  }
-}
 
 function create_billboard_material(baseMaterial, keep_aspect) {
   return createDerivedMaterial(baseMaterial, {
@@ -74,23 +58,6 @@ gl_Position = projectionMatrix * mvPosition;
 
 const MODEL_FORWARD = new Vector3(0, 0, 1)
 
-const step_audios = [
-  new Audio(step1),
-  new Audio(step2),
-  new Audio(step3),
-  new Audio(step4),
-  new Audio(step5),
-  new Audio(step6),
-]
-
-const random_element = arr => arr[Math.floor(Math.random() * arr.length)]
-
-const play_step_sound = throttle(() => {
-  const step_audio = random_element(step_audios)
-  step_audio.currentTime = 0
-  step_audio.play()
-}, 310)
-
 // const CHARACTER_ANIMATIONS = [
 //   'IDLE',
 //   'RUN',
@@ -109,14 +76,19 @@ const play_step_sound = throttle(() => {
 export const Models = {
   iop_male: await load(iop_male, {
     envMapIntensity: 0.5,
+    scale: 0.9,
   }),
   iop_female: await load(iop_female, {
     envMapIntensity: 0.5,
-    scale: 1.2,
+    // scale: 1.2,
   }),
   sram_male: await load(sram_male, {
     envMapIntensity: 0.5,
-    scale: 1.2,
+    // scale: 1.2,
+  }),
+  sram_female: await load(sram_female, {
+    envMapIntensity: 0.5,
+    scale: 0.043,
   }),
 }
 
@@ -250,7 +222,7 @@ export default function create_pools({ scene }) {
             if (current_position.distanceTo(position) < 0.01) return
             instance.entity.set_position(id, {
               ...position,
-              y: position.y - height / 2,
+              y: position.y - height * 0.5,
             })
             // @ts-ignore
             title.position.copy({
@@ -307,19 +279,24 @@ export default function create_pools({ scene }) {
 
   const instances = {
     iop_male: instanciate(Models.iop_male, {
-      height: 1.8,
+      height: 1.7,
       radius: 0.9,
       name: 'iop_male',
     }),
     iop_female: instanciate(Models.iop_female, {
-      height: 1.8,
+      height: 1.7,
       radius: 0.9,
       name: 'iop_female',
     }),
     sram_male: instanciate(Models.sram_male, {
-      height: 1.8,
+      height: 1.7,
       radius: 0.9,
       name: 'sram_male',
+    }),
+    sram_female: instanciate(Models.sram_female, {
+      height: 1.7,
+      radius: 0.9,
+      name: 'sram_female',
     }),
   }
 
@@ -328,6 +305,12 @@ export default function create_pools({ scene }) {
       instances.iop_male.instanced_entity.dispose()
       instances.iop_female.instanced_entity.dispose()
       instances.sram_male.instanced_entity.dispose()
+    },
+    character({ classe, female }) {
+      if (classe === 'IOP')
+        return female ? instances.iop_female : instances.iop_male
+      if (classe === 'SRAM')
+        return female ? instances.sram_female : instances.sram_male
     },
     ...instances,
   }
