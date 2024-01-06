@@ -143,7 +143,7 @@ export default function create_pools({ scene, shared }) {
 
       const body = new Group()
 
-      shared.outline.selectedObjects.push(body)
+      shared?.outline.selectedObjects.push(body)
 
       body.name = `entity:body:${name}`
 
@@ -251,11 +251,6 @@ export default function create_pools({ scene, shared }) {
           },
           remove() {
             scene.remove(title)
-
-            // shared.outline.selectedObjects.splice(
-            //   shared.outline.selectedObjects.indexOf(body),
-            //   1,
-            // )
 
             title.geometry.dispose()
 
