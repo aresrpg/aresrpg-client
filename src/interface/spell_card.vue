@@ -302,7 +302,6 @@ const chance_text = ({ chance }) => {
 .content
   display flex
   flex-flow column nowrap
-  background #212121
   .top
     display grid
     grid "pic title" 1fr "pic level" 1fr / max-content 1fr
