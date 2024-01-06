@@ -23,7 +23,7 @@ const props = defineProps(['type']);
 let iop = null;
 let sram = null;
 let iop_female = null;
-const sram_female = null;
+let sram_female = null;
 
 let scene = null;
 let pool = null;
@@ -35,12 +35,12 @@ function reset_classes() {
   iop?.remove();
   sram?.remove();
   iop_female?.remove();
-  // sram_female?.remove();
+  sram_female?.remove();
 
   iop = null;
   sram = null;
   iop_female = null;
-  // sram_female = null;
+  sram_female = null;
 }
 
 function setup_classe(classe) {
@@ -68,6 +68,12 @@ function display_classe(type) {
       if (!iop_female) {
         iop_female = pool.iop_female.get();
         setup_classe(iop_female);
+      }
+      break;
+    case 'SRAM_FEMALE':
+      if (!sram_female) {
+        sram_female = pool.sram_female.get();
+        setup_classe(sram_female);
       }
       break;
     default:

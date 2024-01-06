@@ -9,15 +9,14 @@ import { abortable } from '../utils/iterator.js'
 
 const MOVE_UPDATE_INTERVAL = 0.1
 const MAX_TITLE_VIEW_DISTANCE = CHUNK_SIZE * 1.3
-const MAX_ANIMATION_DISTANCE = CHUNK_SIZE
+const MAX_ANIMATION_DISTANCE = 64
 
 const CANCELED_BY_MOVING = ['DANCE']
 const CANCELED_BY_NOT_MOVING = ['JUMP', 'WALK', 'RUN']
 
 /** @type {Type.Module} */
 export default function (shared) {
-  /** @type {Map<string, Type.Entity & { jump_time: number, target_position: import("three").Vector3, action: string }>} */
-  const entities = new Map()
+  const { entities } = shared
 
   return {
     name: 'game_world',
@@ -84,32 +83,26 @@ export default function (shared) {
       })
     },
     observe({ events, Pool, send_packet, get_state, signal }) {
-      events.on('packet/entitySpawn', ({ id, position, type, name }) => {
-        if (entities.has(id)) return
+      events.on(
+        'packet/entitySpawn',
+        ({ id, position, type, name, classe, female }) => {
+          if (entities.has(id)) return
 
-        if (type === 'PLAYER') {
-          const entity = Pool.iop_male.get({ id })
-          entity.title.text = name
+          if (type === 'PLAYER') {
+            const entity = Pool.character({ classe, female }).get({ id })
+            entity.title.text = name
 
-          entity.move(position)
-          entities.set(id, {
-            ...entity,
-            jump_time: 0,
-            target_position: null,
-            action: null,
-          })
-
-          // Array.from({ length: 50 }).forEach((val, index) => {
-          //   const entity = Pool.iop_male.get()
-          //   entity.id = `${id}-clone-${Math.random()}`
-          //   entity.title.text = name
-          //   position.x += Math.random() * 10 - 5 + index * 0.1
-          //   position.z += Math.random() * 10 - 5 + index * 0.1
-          //   entity.move(position)
-          //   entities.set(entity.id, entity)
-          // })
-        }
-      })
+            entity.move(position)
+            entities.set(id, {
+              ...entity,
+              jump_time: 0,
+              target_position: null,
+              action: null,
+              audio: null,
+            })
+          }
+        },
+      )
 
       events.on('packet/entityDespawn', ({ id }) => {
         const entity = entities.get(id)

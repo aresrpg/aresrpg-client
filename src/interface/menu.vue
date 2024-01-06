@@ -66,6 +66,11 @@ const characters = [
   { type: 'XELOR', image: xelor, disabled: true },
 ];
 
+function get_character_skin({ classe, female, ...rest }) {
+  if (classe === 'IOP') return female ? iop_f : iop;
+  if (classe === 'SRAM') return female ? sram_f : sram;
+}
+
 const selected_class_data = computed(() => {
   const character = characters.find(
     character => character.type === selected_class_type.value,
@@ -145,7 +150,13 @@ watch(name, value => {
 });
 
 function create_character() {
-  game.value.send_packet('packet/createCharacter', { name: name.value });
+  const female = selected_class_type.value.includes('FEMALE');
+  const classe = selected_class_type.value.includes('IOP') ? 'IOP' : 'SRAM';
+  game.value.send_packet('packet/createCharacter', {
+    name: name.value,
+    classe,
+    female,
+  });
 }
 
 function select_character({ id }) {
@@ -185,7 +196,7 @@ onUnmounted(() => {
         .twitter.ares_btn(@click="open_twitter") Twitter
   .menu_characters(v-if="menu_type === 'CHARACTERS'")
     .character(v-for="character in state.characters" @click="() => select_character(character)")
-      .skin
+      .skin(:style="{ background: `url(${get_character_skin(character)}) center / cover`}")
       .grad
       .name {{ character.name }}
       .level Lvl {{ character.level }}
@@ -281,7 +292,6 @@ a
         position absolute
         width 100%
         height 100%
-        background url('../assets/iop_bg.png') center / cover
         filter grayscale(50%)
         z-index -1
       .grad
@@ -313,6 +323,7 @@ a
       justify-content center
       align-items center
       .skin
+        background url('../assets/iop_bg.png') center / cover
         filter grayscale(100%) blur(3px)
         opacity .6
       >*

@@ -10,6 +10,8 @@ import { CHUNK_CACHE, make_chunk_key } from './utils/chunks.js'
 export default function create_shared_state({ scene, camera }) {
   const sensors = new Map()
   const static_objects = []
+  /** @type {Map<string, Type.Entity & { jump_time: number, target_position: import("three").Vector3, action: string, audio: import("three").PositionalAudio }>} */
+  const entities = new Map()
 
   return {
     outline: new OutlinePass(
@@ -30,5 +32,6 @@ export default function create_shared_state({ scene, camera }) {
       return CHUNK_CACHE.get(make_chunk_key({ x, z, seed }))?.collider
     },
     static_objects,
+    entities,
   }
 }

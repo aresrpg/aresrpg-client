@@ -2,18 +2,16 @@
 import { setInterval } from 'timers/promises'
 
 import { aiter } from 'iterator-helper'
-import { ArrowHelper, Object3D, Vector3 } from 'three'
+import { Object3D, Vector3 } from 'three'
 import { lerp } from 'three/src/math/MathUtils.js'
 import { to_chunk_position } from '@aresrpg/aresrpg-protocol'
 
 import { GRAVITY } from '../game.js'
 import { abortable } from '../utils/iterator'
 import { compute_animation_state } from '../utils/animation.js'
-import {
-  compute_movements,
-  compute_sensors,
-  distance_from_ground,
-} from '../utils/physics.js'
+import { compute_movements, distance_from_ground } from '../utils/physics.js'
+
+import { play_step_sound } from './game_audio.js'
 
 const SPEED = 10
 const WALK_SPEED = 6
@@ -213,6 +211,8 @@ export default function (shared) {
             send_packet('packet/entityAction', { id: '', action: 'RUN' })
           }
         }
+
+        if (on_ground) play_step_sound()
       }
 
       const ground_distance = distance_from_ground(

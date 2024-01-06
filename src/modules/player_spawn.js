@@ -13,17 +13,19 @@ export default function () {
     },
     observe({ events, Pool, dispatch, signal }) {
       events.once('STATE_UPDATED', ({ selected_character_id, characters }) => {
-        const player = Pool.iop_male.get({
-          id: 'player',
-          fixed_title_aspect: true,
-          collider: true,
-        })
-
         const selected_character = characters.find(
           ({ id }) => id === selected_character_id,
         )
 
-        player.title.text = selected_character.name
+        const { classe, female, name, id } = selected_character
+
+        const player = Pool.character({ classe, female }).get({
+          id,
+          fixed_title_aspect: true,
+          collider: true,
+        })
+
+        player.title.text = name
 
         dispatch('action/register_player', player)
 

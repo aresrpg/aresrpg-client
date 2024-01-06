@@ -36,7 +36,7 @@ import {
   request_chunk_load,
   request_plane_chunks_load,
 } from '../utils/chunks.js'
-import { abortable, combine, named_on } from '../utils/iterator.js'
+import { abortable } from '../utils/iterator.js'
 import { create_fractionnal_brownian } from '../world_gen/noise.js'
 import { TASK_MANAGER } from '../game.js'
 import Biomes from '../world_gen/biomes.js'
@@ -306,7 +306,6 @@ export default function () {
         reset_chunks()
 
         scene.remove(instanced_volume)
-        instanced_volume.dispose()
       })
     },
   }
