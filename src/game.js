@@ -203,8 +203,8 @@ function last_event_value(emitter, event, default_value = null) {
 
 async function create_context({ send_packet, connect_ws }) {
   const scene = new Scene()
-  scene.background = new Color('#E0E0E0')
-  scene.fog = new Fog('#E0E0E0', 0, 1500)
+  scene.background = new Color('#90CAF9')
+  scene.fog = new Fog('#90CAF9', 0, 1500)
 
   const renderer = new WebGLRenderer({ antialias: true })
 

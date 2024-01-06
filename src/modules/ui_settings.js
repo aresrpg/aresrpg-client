@@ -83,12 +83,12 @@ export default function () {
         .onFinishChange(handle_change('action/show_terrain_collider'))
 
       terrain_folder
-        .add(settings, 'view_distance', 1, 10, 1)
+        .add(settings, 'view_distance', 1, 15, 1)
         .name('View distance')
         .onFinishChange(handle_change('action/view_distance'))
 
       terrain_folder
-        .add(settings, 'far_view_distance', 5, 40, 1)
+        .add(settings, 'far_view_distance', 5, 60, 1)
         .name('Far view distance')
         .onFinishChange(handle_change('action/far_view_distance'))
 
@@ -110,17 +110,17 @@ export default function () {
         .onFinishChange(handle_change('action/show_entities_collider'))
 
       world_gen_folder
-        .add(Biomes.DEFAULT, 'scale', 1, 3000, 1)
+        .add(Biomes.DEFAULT, 'scale', 1, 4000, 1)
         .name('Scale')
         .onFinishChange(handle_biome_change)
 
       world_gen_folder
-        .add(Biomes.DEFAULT, 'height', 1, 100, 1)
+        .add(Biomes.DEFAULT, 'height', 1, 1000, 1)
         .name('Height')
         .onFinishChange(handle_biome_change)
 
       world_gen_folder
-        .add(Biomes.DEFAULT, 'octaves', 1, 10, 1)
+        .add(Biomes.DEFAULT, 'octaves', 1, 20, 1)
         .name('Octaves')
         .onFinishChange(handle_biome_change)
 
@@ -135,7 +135,7 @@ export default function () {
         .onFinishChange(handle_biome_change)
 
       world_gen_folder
-        .add(Biomes.DEFAULT, 'exponentiation', 0, 10, 0.01)
+        .add(Biomes.DEFAULT, 'exponentiation', 0, 20, 0.01)
         .name('Exponentiation')
         .onFinishChange(handle_biome_change)
 

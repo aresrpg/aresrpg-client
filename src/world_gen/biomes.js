@@ -1,11 +1,11 @@
 export default {
   DEFAULT: {
-    scale: 1100,
-    height: 70,
-    octaves: 6,
-    persistence: 0.25,
-    lacunarity: 3.02,
-    exponentiation: 6.11,
+    scale: 2004,
+    height: 182,
+    octaves: 7,
+    persistence: 0.46,
+    lacunarity: 2.14,
+    exponentiation: 5.6,
     painting: {
       snow_cover_scale: 3,
       snow_cover_threshold: 40,
