@@ -164,10 +164,11 @@ export default function create_pools({ scene, shared }) {
           entity.dispose()
           dispose(body)
           dispose(model)
-          shared.outline.selectedObjects.splice(
-            shared.outline.selectedObjects.indexOf(body),
-            1,
-          )
+          if (shared)
+            shared.outline.selectedObjects.splice(
+              shared.outline.selectedObjects.indexOf(body),
+              1,
+            )
         },
       }
     }
