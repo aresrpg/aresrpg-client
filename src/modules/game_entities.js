@@ -19,7 +19,7 @@ export default function (shared) {
   const { entities } = shared
 
   return {
-    name: 'game_world',
+    name: 'game_entities',
     tick({ settings: { show_entities_collider, debug_mode } }, _, delta) {
       // handle entities movement
       for (const entity of entities.values()) {

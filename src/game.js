@@ -276,16 +276,7 @@ export default async function create_game({
     send_packet,
     connect_ws,
   })
-  const {
-    events,
-    scene,
-    camera,
-    renderer,
-    get_state,
-    dispatch,
-    composer,
-    shared,
-  } = context
+  const { events, renderer, get_state, dispatch, composer, shared } = context
 
   const permanent_modules = PERMANENT_MODULES.map(create => create(shared))
   const game_modules = Object.fromEntries(

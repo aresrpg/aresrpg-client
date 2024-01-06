@@ -44,7 +44,7 @@ import Biomes from '../world_gen/biomes.js'
 /** @type {Type.Module} */
 export default function () {
   return {
-    name: 'game_world',
+    name: 'game_chunks',
     tick(
       { settings: { show_terrain_collider, show_chunk_border, debug_mode } },
       _,

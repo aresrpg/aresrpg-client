@@ -96,8 +96,9 @@ export const Models = {
  *
  * @param {object} param0
  * @param {import("three").Scene} param0.scene
+ * @param {object} param0.shared
  */
-export default function create_pools({ scene }) {
+export default function create_pools({ scene, shared }) {
   function instanciate(clone_model, { height, radius, name }) {
     function create_collider(id) {
       const collider_geometry = new BoxGeometry(radius, height, radius, 2)
@@ -142,6 +143,8 @@ export default function create_pools({ scene }) {
 
       const body = new Group()
 
+      shared.outline.selectedObjects.push(body)
+
       body.name = `entity:body:${name}`
 
       scene.add(body)
@@ -161,6 +164,10 @@ export default function create_pools({ scene }) {
           entity.dispose()
           dispose(body)
           dispose(model)
+          shared.outline.selectedObjects.splice(
+            shared.outline.selectedObjects.indexOf(body),
+            1,
+          )
         },
       }
     }
@@ -207,8 +214,6 @@ export default function create_pools({ scene }) {
 
         const current_position = new Vector3()
         let current_animation = 'IDLE'
-
-        // shared.outline.selectedObjects.push(body)
 
         return {
           id,
