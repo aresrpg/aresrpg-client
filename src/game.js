@@ -53,8 +53,15 @@ import game_chunks from './modules/game_chunks.js'
 import player_spawn from './modules/player_spawn.js'
 import game_instanced from './modules/game_instanced.js'
 import TaskManager from './utils/TaskManager.js'
+import {
+  HEIGHTS,
+  create_shared_fractionnal_brownian,
+} from './world_gen/noise.js'
+
+import './utils/import_map.js'
 
 export const GRAVITY = 9.81
+export const HEIGHTFIELD = create_shared_fractionnal_brownian(HEIGHTS)
 
 const DEBUG_MODE = true
 const LOADING_MANAGER = DefaultLoadingManager
@@ -104,14 +111,10 @@ export const INITIAL_STATE = {
       ['KeyF', 'dance'],
       ['ShiftLeft', 'walk'],
     ]),
-    show_terrain: true,
-    show_terrain_collider: false,
     show_entities_collider: false,
-    show_navmesh: false,
 
     view_distance: 3,
     far_view_distance: 20,
-    show_chunk_border: false,
 
     free_camera: false,
 
@@ -128,12 +131,6 @@ export const INITIAL_STATE = {
     walk: false,
     jump: false,
     dance: false,
-  },
-
-  world: {
-    seed: '',
-    /** @type {(x: number, z: number) => number} */
-    heightfield: null,
   },
 
   /** @type {Type.Entity} */

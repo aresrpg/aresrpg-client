@@ -3,16 +3,15 @@ import { CHUNK_SIZE } from '@aresrpg/aresrpg-protocol'
 import { unpack_color } from '../utils/InstancedVolume.js'
 
 import { block_at_index, get_voxel_data } from './chunk_data.js'
-import { create_fractionnal_brownian } from './noise'
+import { create_shared_fractionnal_brownian } from './noise'
 
 export default function create_plane_chunk_column({
   chunk_x,
   chunk_z,
-  seed,
   segments,
-  biome,
+  noise_buffer,
 }) {
-  const heightfield = create_fractionnal_brownian(seed, biome)
+  const heightfield = create_shared_fractionnal_brownian(noise_buffer)
 
   // Define the size of each segment in the chunk
   const segment_size = CHUNK_SIZE / segments

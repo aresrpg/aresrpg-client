@@ -10,7 +10,6 @@ const temporary_vector2 = new Vector3()
 const ray = new Raycaster()
 const down_vector = new Vector3(0, -1, 0)
 
-ray.firstHitOnly = true
 ray.far = 5
 
 const raycast_result = []

@@ -6,7 +6,7 @@ import { Object3D, Vector3 } from 'three'
 import { lerp } from 'three/src/math/MathUtils.js'
 import { to_chunk_position } from '@aresrpg/aresrpg-protocol'
 
-import { GRAVITY } from '../game.js'
+import { GRAVITY, HEIGHTFIELD } from '../game.js'
 import { abortable } from '../utils/iterator'
 import { compute_animation_state } from '../utils/animation.js'
 import { compute_movements, distance_from_ground } from '../utils/physics.js'
@@ -47,12 +47,8 @@ export default function (shared) {
 
   return {
     name: 'player_movements',
-    tick(
-      { inputs, player, world: { heightfield, seed } },
-      { camera, send_packet, events, scene },
-      delta,
-    ) {
-      if (!player) return
+    tick({ inputs, player }, { camera, send_packet }, delta) {
+      if (!player?.position) return
 
       const origin = player.position.clone()
 
@@ -67,8 +63,6 @@ export default function (shared) {
 
       if (player.target_position) {
         player.move(player.target_position)
-        events.emit('CHANGE_CHUNK', to_chunk_position(player.target_position))
-
         player.target_position = null
 
         return
@@ -83,7 +77,7 @@ export default function (shared) {
       if (origin.y <= -30) {
         velocity.setScalar(0)
         const { x, z } = origin
-        player.move(new Vector3(origin.x, heightfield(x, z) + 5, origin.z))
+        player.move(new Vector3(origin.x, HEIGHTFIELD(x, z) + 5, origin.z))
         return
       }
 
@@ -156,36 +150,28 @@ export default function (shared) {
           else velocity.y -= GRAVITY * delta
       }
 
-      const terrain_collider = shared.get_chunk_collider({
-        ...to_chunk_position(origin.clone().add(movement).floor()),
-        seed,
-      })
+      movement.addScaledVector(velocity, delta)
+      dummy.position.copy(origin.clone().add(movement))
 
-      for (let step = 0; step < PHYSIC_STEPS; step++) {
-        const scaled_delta = delta / PHYSIC_STEPS
-        movement.addScaledVector(velocity, scaled_delta)
-        dummy.position.copy(origin).add(movement)
-        dummy.updateMatrixWorld()
+      const ground_height = HEIGHTFIELD(dummy.position.x, dummy.position.z)
 
-        if (!terrain_collider) {
-          return
-        }
+      if (!ground_height) return
 
-        // I don't like having side effects in an outter function but I'm unable to make bvh works without it
-        on_ground = compute_movements({
-          dummy,
-          terrain_collider,
-          character: {
-            capsule_radius: player.radius,
-            capsule_segment: player.segment,
-          },
-          delta,
-          velocity,
-          objects: shared.static_objects,
-        })
+      const target_y = ground_height + player.height + 0.2
+      const dummy_bottom_y = dummy.position.y - player.height - 0.2
+      const ground_height_distance = ground_height - dummy_bottom_y
 
-        player.move(dummy.position)
+      if (dummy_bottom_y <= ground_height) {
+        dummy.position.y = lerp(dummy.position.y, target_y, 0.2)
+        velocity.y = 0
+        on_ground = true
+      } else {
+        on_ground = false
       }
+
+      if (ground_height_distance > 2) dummy.position.copy(origin)
+
+      player.move(dummy.position)
 
       const is_moving_horizontally =
         inputs.forward || inputs.backward || inputs.right || inputs.left
@@ -215,16 +201,9 @@ export default function (shared) {
         if (on_ground) play_step_sound()
       }
 
-      const ground_distance = distance_from_ground(
-        {
-          position: origin,
-          height: player.height,
-        },
-        scene,
-      )
-
       const animation_name = compute_animation_state({
-        is_on_ground: ground_distance < 5,
+        is_on_ground: dummy_bottom_y - 4 < ground_height,
+        // is_on_ground: ground_distance < 5,
         is_moving_horizontally,
         action:
           jump_state === jump_states.ASCENT
@@ -241,9 +220,6 @@ export default function (shared) {
 
       const last_chunk = to_chunk_position(origin)
       const current_chunk = to_chunk_position(dummy.position)
-
-      if (last_chunk.x !== current_chunk.x || last_chunk.z !== current_chunk.z)
-        events.emit('CHANGE_CHUNK', current_chunk)
 
       // compute_sensors({
       //   player,
@@ -266,7 +242,7 @@ export default function (shared) {
       }
       return state
     },
-    observe({ events, signal, dispatch, get_state, send_packet, scene }) {
+    observe({ events, signal, get_state, send_packet, dispatch }) {
       aiter(abortable(setInterval(50, null, { signal }))).reduce(
         last_position => {
           const { player } = get_state()
@@ -299,8 +275,8 @@ export default function (shared) {
         chunks_loaded = true
       })
 
-      // notify the server that we are ready to receive chunks and more
-      send_packet('packet/joinGameReady', {})
+      // @ts-ignore
+      dispatch('') // dispatch meaningless action to trigger the first state change and allow player_spawn.js to register the player
     },
   }
 }

@@ -9,6 +9,10 @@ export default class TaskManager {
     this.#tasks.push(task)
   }
 
+  clear() {
+    this.#tasks.length = 0
+  }
+
   tick(time_left) {
     const start = performance.now()
     const adjusted_time_left = time_left * 0.5

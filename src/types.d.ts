@@ -27,7 +27,6 @@ declare namespace Type {
   type Entity = {
     id: string
     title: import('troika-three-text').Text
-    collider: import('three').Object3D
     height: number
     radius: number
     position: import('three').Vector3
@@ -44,7 +43,6 @@ declare namespace Type {
   type Actions = {
     'action/show_fps': boolean
     'action/target_fps': number
-    'action/show_terrain_collider': boolean
     'action/show_entities_collider': boolean
     'action/keydown': string
     'action/keyup': string
@@ -53,7 +51,6 @@ declare namespace Type {
     'action/select_character': string
     'action/view_distance': number
     'action/far_view_distance': number
-    'action/show_chunk_border': boolean
     'action/free_camera': boolean
   } & Packets
 
@@ -62,7 +59,6 @@ declare namespace Type {
       STATE_UPDATED: State // the game state has been updated
       MOVE_MENU_CAMERA: [number, number, number] // move the camera of the menu screen
       CONNECT_TO_SERVER: void // request ws connection to the server
-      CHANGE_CHUNK: { x: number; z: number } // change the current chunk
       SET_TIME: number // set the time of the day
       TIME_CHANGE: number // the time of the day has changed
       CLEAR_CHUNKS: void // clear all chunks

@@ -1,4 +1,4 @@
-import Biomes from './biomes'
+import Biomes from './biomes.js'
 
 export const BLOCKS = {
   STONE: 0x8a8a8a,

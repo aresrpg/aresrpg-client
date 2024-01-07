@@ -1,9 +1,7 @@
 import {
-  BoxGeometry,
   Group,
   Line3,
   LoopOnce,
-  Mesh,
   MeshBasicMaterial,
   Quaternion,
   Vector3,
@@ -100,26 +98,6 @@ export const Models = {
  */
 export default function create_pools({ scene, shared }) {
   function instanciate(clone_model, { height, radius, name }) {
-    function create_collider(id) {
-      const collider_geometry = new BoxGeometry(radius, height, radius, 2)
-      const collider_mesh = new Mesh(
-        collider_geometry,
-        new MeshBasicMaterial({
-          color: 0x00ff00,
-          wireframe: true,
-          opacity: 0.5,
-        }),
-      )
-      collider_mesh.castShadow = true
-      collider_mesh.receiveShadow = true
-      collider_mesh.name = `entity:collider:${id}`
-      collider_mesh.position.y -= height / 2 - 0.1
-
-      scene.add(collider_mesh)
-
-      return collider_mesh
-    }
-
     /**
      *
      * @param {InstancedEntity} existing_instance
@@ -181,15 +159,12 @@ export default function create_pools({ scene, shared }) {
 
     return {
       instanced_entity: instance,
-      /** @type {(options: {  fixed_title_aspect?: boolean; id?: string; collider?: boolean  } = {}) => Type.Entity} */
-      get({ id = nanoid(), fixed_title_aspect, collider = false } = {}) {
+      /** @type {(options: {  fixed_title_aspect?: boolean; id?: string;  } = {}) => Type.Entity} */
+      get({ id = nanoid(), fixed_title_aspect } = {}) {
         if (!id) throw new Error('id is required')
-
-        const collider_mesh = collider ? create_collider() : null
 
         const success = instance.entity.add_entity(id)
 
-        // !FIXME: This doesn't work for whatever reason..
         if (!success) {
           instance.dispose()
 
@@ -213,13 +188,12 @@ export default function create_pools({ scene, shared }) {
 
         instance.entity.set_animation(id, 'IDLE')
 
-        const current_position = new Vector3()
+        const current_position = new Vector3(-1, -1, -1)
         let current_animation = 'IDLE'
 
         return {
           id,
           title,
-          collider: collider_mesh,
           height,
           radius,
           segment: new Line3(new Vector3(), new Vector3(0, height / 2, 0)),
@@ -236,8 +210,6 @@ export default function create_pools({ scene, shared }) {
               y: position.y + height,
             })
             // @ts-ignore
-            collider_mesh?.position.copy(position)
-            // @ts-ignore
             current_position.copy(position)
           },
           rotate(movement) {
@@ -252,12 +224,7 @@ export default function create_pools({ scene, shared }) {
           },
           remove() {
             scene.remove(title)
-
             title.geometry.dispose()
-
-            collider_mesh?.geometry.dispose()
-            collider_mesh?.material.dispose()
-
             instance.entity.remove_entity(id)
           },
           set_low_priority(priority) {

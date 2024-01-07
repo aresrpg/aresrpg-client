@@ -1,41 +1,19 @@
 import { on } from 'events'
 
-import {
-  PerspectiveCamera,
-  Vector2,
-  Vector3,
-  Vector4,
-  Quaternion,
-  Matrix4,
-  Spherical,
-  Box3,
-  Sphere,
-  Raycaster,
-  Ray,
-} from 'three'
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
 import { aiter } from 'iterator-helper'
 import CameraControls from 'camera-controls'
 
 import { abortable } from '../utils/iterator.js'
 
-const CAMERA_MAX_POLAR_ANGLE = Math.PI * 0.5 * 0.7 //  70% of the half PI
 const CAMERA_MIN_ZOOM = 4
 const CAMERA_MAX_ZOOM = 500
 
 /** @type {import("../game").Module} */
 export default function () {
-  const camera_rotation = new Vector3(0.8, 0, 0)
-  const spherical_radius = 4
-
   return {
     name: 'game_camera',
-    tick(
-      { player, settings: { free_camera } },
-      { camera, camera_controls },
-      delta,
-    ) {
-      if (!player) return
+    tick({ player, settings: { free_camera } }, { camera_controls }, delta) {
+      if (!player?.position) return
 
       if (!free_camera) {
         const { x, y, z } = player.position
@@ -43,18 +21,9 @@ export default function () {
         camera_controls.moveTo(x, y, z, true)
         camera_controls.setTarget(x, y, z, true)
       }
-
       camera_controls.update(delta)
     },
-    observe({
-      events,
-      camera,
-      camera_controls,
-      get_state,
-      renderer,
-      signal,
-      scene,
-    }) {
+    observe({ events, camera, camera_controls, renderer, signal }) {
       function set_camera_padding(top, right, bottom, left) {
         const full_width = window.innerWidth - left + right
         const full_height = window.innerHeight - top + bottom

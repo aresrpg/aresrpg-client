@@ -4,7 +4,7 @@ import { GUI } from 'dat.gui'
 import { aiter } from 'iterator-helper'
 import { Vector3 } from 'three'
 
-import { INITIAL_STATE } from '../game'
+import { HEIGHTFIELD, INITIAL_STATE } from '../game'
 import Biomes from '../world_gen/biomes.js'
 
 import { DAY_DURATION } from './game_lights.js'
@@ -24,13 +24,11 @@ export default function () {
 
       const game_folder = gui.addFolder('Game Settings')
       const terrain_folder = gui.addFolder('Terrain Settings')
-      const entity_folder = gui.addFolder('Entity Settings')
       const world_gen_folder = gui.addFolder('World Gen Settings')
       const camera_folder = gui.addFolder('Camera Settings')
 
       const handle_change = name => value => dispatch(name, value)
       const handle_biome_change = () => {
-        dispatch('packet/worldSeed', get_state().world.seed)
         events.emit('CLEAR_CHUNKS')
       }
 
@@ -48,17 +46,14 @@ export default function () {
         .add(
           {
             teleport: () => {
-              const {
-                player,
-                world: { heightfield },
-              } = get_state()
+              const { player } = get_state()
               // @ts-ignore
               const { x, z } = player.position
 
               dispatch('packet/playerPosition', {
                 position: {
                   x,
-                  y: heightfield(x, z) + 5,
+                  y: HEIGHTFIELD(x, z) + 5,
                   z,
                 },
               })
@@ -78,24 +73,14 @@ export default function () {
         .name('Set day')
 
       terrain_folder
-        .add(settings, 'show_terrain_collider')
-        .name('Terrain collider')
-        .onFinishChange(handle_change('action/show_terrain_collider'))
-
-      terrain_folder
-        .add(settings, 'view_distance', 1, 15, 1)
+        .add(settings, 'view_distance', 1, 10, 1)
         .name('View distance')
         .onFinishChange(handle_change('action/view_distance'))
 
       terrain_folder
-        .add(settings, 'far_view_distance', 5, 60, 1)
+        .add(settings, 'far_view_distance', 5, 50, 1)
         .name('Far view distance')
         .onFinishChange(handle_change('action/far_view_distance'))
-
-      terrain_folder
-        .add(settings, 'show_chunk_border')
-        .name('Show Chunk Border')
-        .onFinishChange(handle_change('action/show_chunk_border'))
 
       terrain_folder
         .add(
@@ -104,40 +89,35 @@ export default function () {
         )
         .name('Clear Chunks')
 
-      entity_folder
-        .add(settings, 'show_entities_collider')
-        .name('Entities collider')
-        .onFinishChange(handle_change('action/show_entities_collider'))
+      // world_gen_folder
+      //   .add(Biomes.DEFAULT, 'scale', 1, 4000, 1)
+      //   .name('Scale')
+      //   .onFinishChange(handle_biome_change)
 
-      world_gen_folder
-        .add(Biomes.DEFAULT, 'scale', 1, 4000, 1)
-        .name('Scale')
-        .onFinishChange(handle_biome_change)
+      // world_gen_folder
+      //   .add(Biomes.DEFAULT, 'height', 1, 1000, 1)
+      //   .name('Height')
+      //   .onFinishChange(handle_biome_change)
 
-      world_gen_folder
-        .add(Biomes.DEFAULT, 'height', 1, 1000, 1)
-        .name('Height')
-        .onFinishChange(handle_biome_change)
+      // world_gen_folder
+      //   .add(Biomes.DEFAULT, 'octaves', 1, 20, 1)
+      //   .name('Octaves')
+      //   .onFinishChange(handle_biome_change)
 
-      world_gen_folder
-        .add(Biomes.DEFAULT, 'octaves', 1, 20, 1)
-        .name('Octaves')
-        .onFinishChange(handle_biome_change)
+      // world_gen_folder
+      //   .add(Biomes.DEFAULT, 'persistence', 0, 1, 0.01)
+      //   .name('Persistence')
+      //   .onFinishChange(handle_biome_change)
 
-      world_gen_folder
-        .add(Biomes.DEFAULT, 'persistence', 0, 1, 0.01)
-        .name('Persistence')
-        .onFinishChange(handle_biome_change)
+      // world_gen_folder
+      //   .add(Biomes.DEFAULT, 'lacunarity', 0, 10, 0.01)
+      //   .name('Lacunarity')
+      //   .onFinishChange(handle_biome_change)
 
-      world_gen_folder
-        .add(Biomes.DEFAULT, 'lacunarity', 0, 10, 0.01)
-        .name('Lacunarity')
-        .onFinishChange(handle_biome_change)
-
-      world_gen_folder
-        .add(Biomes.DEFAULT, 'exponentiation', 0, 20, 0.01)
-        .name('Exponentiation')
-        .onFinishChange(handle_biome_change)
+      // world_gen_folder
+      //   .add(Biomes.DEFAULT, 'exponentiation', 0, 20, 0.01)
+      //   .name('Exponentiation')
+      //   .onFinishChange(handle_biome_change)
 
       camera_folder
         .add(settings, 'free_camera')
@@ -147,8 +127,7 @@ export default function () {
       gui.show()
       game_folder.open()
       terrain_folder.open()
-      entity_folder.open()
-      world_gen_folder.open()
+      // world_gen_folder.open()
       camera_folder.open()
     },
   }

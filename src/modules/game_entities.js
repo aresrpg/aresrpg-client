@@ -20,7 +20,7 @@ export default function (shared) {
 
   return {
     name: 'game_entities',
-    tick({ settings: { show_entities_collider, debug_mode } }, _, delta) {
+    tick(_, __, delta) {
       // handle entities movement
       for (const entity of entities.values()) {
         if (entity.jump_time == null) entity.jump_time = 0
@@ -74,13 +74,6 @@ export default function (shared) {
           )
         }
       }
-
-      if (!debug_mode) return
-
-      entities.forEach(({ collider }) => {
-        if (collider && collider.visible !== show_entities_collider)
-          collider.visible = show_entities_collider
-      })
     },
     observe({ events, Pool, send_packet, get_state, signal }) {
       events.on(
@@ -167,9 +160,6 @@ export default function (shared) {
           entity.action = action
         }
       })
-
-      // notify the server that we are ready to receive chunks and more
-      send_packet('packet/joinGameReady', {})
     },
   }
 }

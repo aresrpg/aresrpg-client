@@ -65,7 +65,6 @@ export default function () {
       iop = Pool.iop_male.get({
         id: nanoid(),
         fixed_title_aspect: true,
-        collider: false,
       })
 
       iop.move(new Vector3(2, 1.6, 8))
@@ -74,7 +73,6 @@ export default function () {
       sram = Pool.sram_male.get({
         id: nanoid(),
         fixed_title_aspect: true,
-        collider: false,
       })
 
       sram.move(new Vector3(4, 1.6, 9))
@@ -82,7 +80,6 @@ export default function () {
       const iopette = Pool.iop_female.get({
         id: nanoid(),
         fixed_title_aspect: true,
-        collider: false,
       })
 
       iopette.move(new Vector3(-2, 2.3, 11.7))
@@ -155,9 +152,7 @@ export default function () {
 
         dispose(grass)
         instanced_forest.dispose()
-        instanced_volume.remove_volume(vol1)
-        instanced_volume.remove_volume(vol2)
-        instanced_volume.remove_volume(vol3)
+        instanced_volume.clear_volumes()
 
         clearInterval(audio_interval)
 

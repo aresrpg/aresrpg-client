@@ -2,7 +2,7 @@ import ndarray from 'ndarray'
 import { CHUNK_SIZE, WORLD_HEIGHT } from '@aresrpg/aresrpg-protocol'
 
 import greedy_mesh from './greedy_mesh.js'
-import { create_fractionnal_brownian } from './noise.js'
+import { create_shared_fractionnal_brownian } from './noise.js'
 import { get_voxel_data } from './chunk_data.js'
 
 function is_chunk_empty({ chunk_x, chunk_z, row, heightfield }) {
@@ -67,8 +67,7 @@ function create_chunk({ chunk_x, chunk_z, row, heightfield, column }) {
 export default function create_voxel_chunk_column({
   chunk_x,
   chunk_z,
-  seed,
-  biome,
+  noise_buffer,
 }) {
   const row_amount = WORLD_HEIGHT / CHUNK_SIZE
   const column = ndarray(new Array(CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE), [
@@ -76,7 +75,7 @@ export default function create_voxel_chunk_column({
     WORLD_HEIGHT,
     CHUNK_SIZE,
   ])
-  const heightfield = create_fractionnal_brownian(seed, biome)
+  const heightfield = create_shared_fractionnal_brownian(noise_buffer)
 
   // Fill voxel data for each layer in the chunk
   for (let row = 0; row < row_amount; row++) {
