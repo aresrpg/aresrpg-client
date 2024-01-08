@@ -188,7 +188,7 @@ export default function create_pools({ scene, shared }) {
 
         instance.entity.set_animation(id, 'IDLE')
 
-        const current_position = new Vector3(-1, -1, -1)
+        const current_position = new Vector3(0, 200, 0)
         let current_animation = 'IDLE'
 
         return {
