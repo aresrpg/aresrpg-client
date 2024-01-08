@@ -21,7 +21,6 @@ const APEX_GRAVITY_FACTOR = 0.3
 const DESCENT_GRAVITY_FACTOR = 5
 const JUMP_FORWARD_IMPULSE = 3
 const JUMP_COOLDWON = 0.1 // one jump every 100ms
-const PHYSIC_STEPS = 3
 
 const jump_states = {
   ASCENT: 'ASCENT',
