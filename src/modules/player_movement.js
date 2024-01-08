@@ -147,7 +147,7 @@ export default function (shared) {
         default:
           // if not jumping, apply normal gravity as long as chunks are there
           if (on_ground) velocity.y = -GRAVITY * delta
-          else velocity.y -= GRAVITY * delta
+          else velocity.y -= GRAVITY * DESCENT_GRAVITY_FACTOR * delta
       }
 
       movement.addScaledVector(velocity, delta)
