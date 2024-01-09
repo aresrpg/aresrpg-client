@@ -62,7 +62,6 @@ export default defineConfig(({ mode }) => {
         protocolImports: true,
       }),
       VitePWA({
-        includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
         registerType: 'autoUpdate',
         workbox: {
           runtimeCaching: [

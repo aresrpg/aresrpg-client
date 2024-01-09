@@ -65,13 +65,13 @@ export default function () {
 
       iop = Pool.iop_male.get(nanoid())
 
-      iop.move(new Vector3(-19, 37.88, 45))
-      iop.animate('IDLE')
+      iop.move(new Vector3(-18.5, 38, 45))
+      iop.animate('SIT')
 
       sram = Pool.sram_male.get(nanoid())
 
-      sram.move(new Vector3(-21, 38.05, 45))
-      sram.animate('SIT')
+      sram.move(new Vector3(-20, 38, 45))
+      sram.animate('IDLE')
 
       iopette = Pool.iop_female.get(nanoid())
 
