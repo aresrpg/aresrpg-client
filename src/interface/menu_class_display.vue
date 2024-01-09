@@ -9,6 +9,7 @@ import {
   Vector3,
   AmbientLight,
 } from 'three';
+import { nanoid } from 'nanoid';
 
 import create_pool from '../pool.js';
 import dispose from '../utils/dispose.js';
@@ -54,25 +55,25 @@ function display_classe(type) {
   switch (type) {
     case 'IOP_MALE':
       if (!iop) {
-        iop = pool.iop_male.get();
+        iop = pool.iop_male.get(nanoid());
         setup_classe(iop);
       }
       break;
     case 'SRAM_MALE':
       if (!sram) {
-        sram = pool.sram_male.get();
+        sram = pool.sram_male.get(nanoid());
         setup_classe(sram);
       }
       break;
     case 'IOP_FEMALE':
       if (!iop_female) {
-        iop_female = pool.iop_female.get();
+        iop_female = pool.iop_female.get(nanoid());
         setup_classe(iop_female);
       }
       break;
     case 'SRAM_FEMALE':
       if (!sram_female) {
-        sram_female = pool.sram_female.get();
+        sram_female = pool.sram_female.get(nanoid());
         setup_classe(sram_female);
       }
       break;

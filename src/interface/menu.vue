@@ -109,12 +109,12 @@ function play() {
 }
 
 function show_characters_menu() {
-  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 3, 4]);
+  game.value.events.emit('MOVE_MENU_CAMERA', [-10, 45, 47]);
   menu_type.value = 'CHARACTERS';
 }
 
 function show_characters_creation() {
-  game.value.events.emit('MOVE_MENU_CAMERA', [-8, 1.6, 4]);
+  game.value.events.emit('MOVE_MENU_CAMERA', [-10, 39, 50]);
   menu_type.value = 'CREATE_CHARACTER';
 }
 
