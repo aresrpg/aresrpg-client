@@ -3,7 +3,7 @@ import { iter } from 'iterator-helper'
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass'
 import { Vector2 } from 'three'
 
-import { CHUNK_CACHE, make_chunk_key } from './utils/chunks.js'
+import { make_chunk_key } from './utils/chunks.js'
 
 export default function create_shared_state({ scene, camera }) {
   const sensors = new Map()

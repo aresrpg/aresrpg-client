@@ -77,7 +77,7 @@ export default function () {
       sunlight.shadow.camera.right = CAMERA_SHADOW_SIZE
       sunlight.shadow.camera.top = CAMERA_SHADOW_SIZE
       sunlight.shadow.camera.bottom = -CAMERA_SHADOW_SIZE
-      sunlight.shadow.bias = -0.001 // This value may need tweaking
+      sunlight.shadow.bias = -0.000005 // This value may need tweaking
 
       sunlight.shadow.camera.updateProjectionMatrix()
       suncamera_helper.update()
@@ -92,7 +92,8 @@ export default function () {
       moonlight.shadow.camera.right = CAMERA_SHADOW_SIZE
       moonlight.shadow.camera.top = CAMERA_SHADOW_SIZE
       moonlight.shadow.camera.bottom = -CAMERA_SHADOW_SIZE
-      // moonlight.shadow.bias = -0.001 // This value may need tweaking
+      // moonlight.shadow.bias = 0.2 // This value may need tweaking
+      moonlight.shadow.bias = -0.000005 // This value may need tweaking
 
       moonlight.shadow.camera.updateProjectionMatrix()
       mooncamera_helper.update()

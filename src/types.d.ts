@@ -31,12 +31,12 @@ declare namespace Type {
     radius: number
     position: import('three').Vector3
     target_position: Position
-    segment: import('three').Line3
-    set_low_priority: (skip: boolean) => void
+    set_low_priority?: (skip: boolean) => void
     move: (position: Position) => void
     rotate: (rotation: import('three').Vector3) => void
     animate: (name: string) => void
     remove: () => void
+    mixer?: import('three').AnimationMixer
   }
 
   // Distributed actions which can be dispatched and then reduced

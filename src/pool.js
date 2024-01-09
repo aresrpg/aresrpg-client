@@ -1,14 +1,6 @@
-import {
-  Group,
-  Line3,
-  LoopOnce,
-  MeshBasicMaterial,
-  Quaternion,
-  Vector3,
-} from 'three'
+import { Group, LoopOnce, MeshBasicMaterial, Quaternion, Vector3 } from 'three'
 import { Text } from 'troika-three-text'
 import { createDerivedMaterial } from 'troika-three-utils'
-import { nanoid } from 'nanoid'
 
 import { load } from './utils/load_model.js'
 import iop_male from './models/iop_male.glb?url'
@@ -90,6 +82,13 @@ export const Models = {
   }),
 }
 
+function fade_to_animation(from, to, duration = 0.3) {
+  if (from !== to) {
+    from?.fadeOut(duration)
+    to.reset().fadeIn(duration).play()
+  }
+}
+
 /**
  *
  * @param {object} param0
@@ -104,7 +103,7 @@ export default function create_pools({ scene, shared }) {
      */
     function create_instance(existing_instance) {
       const { model, skinned_mesh, compute_animations } = clone_model()
-      const { mixer, actions } = compute_animations(model)
+      const { mixer, actions } = compute_animations()
 
       const entity =
         existing_instance?.expand({
@@ -159,8 +158,8 @@ export default function create_pools({ scene, shared }) {
 
     return {
       instanced_entity: instance,
-      /** @type {(options: {  fixed_title_aspect?: boolean; id?: string;  } = {}) => Type.Entity} */
-      get({ id = nanoid(), fixed_title_aspect } = {}) {
+      /** @type {(id: string) => Type.Entity} */
+      get(id) {
         if (!id) throw new Error('id is required')
 
         const success = instance.entity.add_entity(id)
@@ -181,7 +180,7 @@ export default function create_pools({ scene, shared }) {
         title.outlineWidth = 0.02
         title.material = create_billboard_material(
           new MeshBasicMaterial(),
-          fixed_title_aspect,
+          false,
         )
 
         scene.add(title)
@@ -196,7 +195,6 @@ export default function create_pools({ scene, shared }) {
           title,
           height,
           radius,
-          segment: new Line3(new Vector3(), new Vector3(0, height / 2, 0)),
           move(position) {
             // @ts-ignore
             if (current_position.distanceTo(position) < 0.01) return
@@ -231,7 +229,6 @@ export default function create_pools({ scene, shared }) {
             instance.entity.set_low_priority(id, priority)
           },
           animate(name) {
-            // if (clip === 'RUN') play_step_sound()
             if (name === 'IDLE' && current_animation === 'DANCE') return
             if (name !== current_animation) {
               instance.entity.set_animation(id, name)
@@ -239,6 +236,76 @@ export default function create_pools({ scene, shared }) {
             }
           },
           position: current_position,
+          target_position: null,
+        }
+      },
+      get_non_instanced(outline) {
+        const { model, compute_animations } = clone_model()
+        const { mixer, actions } = compute_animations()
+
+        const origin = new Group()
+        const title = new Text()
+
+        title.fontSize = 0.2
+        title.color = 'white'
+        title.anchorX = 'center'
+        title.outlineWidth = 0.02
+        title.material = create_billboard_material(
+          new MeshBasicMaterial(),
+          false,
+        )
+
+        origin.add(title)
+        origin.add(model)
+
+        title.position.y += height
+        model.position.y -= height * 0.5
+
+        scene.add(origin)
+
+        let current_animation = actions.IDLE
+
+        current_animation.play()
+
+        outline.selectedObjects.push(model)
+
+        return {
+          id: 'PLAYER',
+          title,
+          height,
+          radius,
+          mixer,
+          move(position) {
+            origin.position.copy(position)
+          },
+          rotate(movement) {
+            // Normalize the movement vector in the horizontal plane (x-z)
+            const flat_movement = movement.clone().setY(0).normalize()
+            // Calculate the target quaternion: this rotates modelForward to align with flatMovement
+            const quaternion = new Quaternion().setFromUnitVectors(
+              MODEL_FORWARD,
+              flat_movement,
+            )
+            origin.quaternion.copy(quaternion)
+          },
+          remove() {
+            scene.remove(origin)
+            dispose(origin)
+            outline.selectedObjects.splice(
+              outline.selectedObjects.indexOf(origin),
+              1,
+            )
+          },
+          animate(name) {
+            if (name === 'IDLE' && current_animation === actions.DANCE) return
+
+            const animation = actions[name]
+            if (animation && animation !== current_animation) {
+              fade_to_animation(current_animation, animation)
+              current_animation = animation
+            }
+          },
+          position: origin.position,
           target_position: null,
         }
       },

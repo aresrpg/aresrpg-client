@@ -170,7 +170,8 @@ export default function (shared) {
 
       if (ground_height_distance > 2) dummy.position.copy(origin)
 
-      player.move(dummy.position)
+      if (player.position.distanceTo(dummy.position) > 0.01)
+        player.move(dummy.position)
 
       const is_moving_horizontally =
         inputs.forward || inputs.backward || inputs.right || inputs.left

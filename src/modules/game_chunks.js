@@ -93,6 +93,9 @@ export default function () {
             }),
           )
 
+          low_detail_plane.castShadow = true
+          low_detail_plane.receiveShadow = true
+
           low_detail_plane.geometry.computeVertexNormals()
 
           scene.add(low_detail_plane)

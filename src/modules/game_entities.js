@@ -82,7 +82,7 @@ export default function (shared) {
           if (entities.has(id)) return
 
           if (type === 'PLAYER') {
-            const entity = Pool.character({ classe, female }).get({ id })
+            const entity = Pool.character({ classe, female }).get(id)
             entity.title.text = name
 
             entity.move(position)

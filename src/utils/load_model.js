@@ -42,11 +42,12 @@ export async function load(
 
   return () => {
     const cloned = clone(scene)
+
     return {
       model: cloned,
       skinned_mesh: cloned.getObjectByName(mesh_name),
-      compute_animations(model) {
-        const mixer = new AnimationMixer(model)
+      compute_animations() {
+        const mixer = new AnimationMixer(cloned)
         return {
           mixer,
           actions: Object.fromEntries(

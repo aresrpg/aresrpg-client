@@ -199,8 +199,8 @@ function last_event_value(emitter, event, default_value = null) {
 
 async function create_context({ send_packet, connect_ws }) {
   const scene = new Scene()
-  scene.background = new Color('#90CAF9')
-  scene.fog = new Fog('#90CAF9', 0, 1500)
+  scene.background = new Color('#000000')
+  scene.fog = new Fog('#000000', 0, 1500)
 
   const renderer = new WebGLRenderer({ antialias: true })
 
@@ -211,7 +211,7 @@ async function create_context({ send_packet, connect_ws }) {
   renderer.outputColorSpace = SRGBColorSpace
   // renderer.shadowMap.type = VSMShadowMap
   renderer.toneMapping = ACESFilmicToneMapping
-  renderer.toneMappingExposure = Math.pow(0.9, 5.0)
+  renderer.toneMappingExposure = Math.pow(0.6, 4.0)
   renderer.info.autoReset = false
 
   const composer = new EffectComposer(renderer)
@@ -272,7 +272,16 @@ export default async function create_game({
     send_packet,
     connect_ws,
   })
-  const { events, renderer, get_state, dispatch, composer, shared } = context
+  const {
+    events,
+    renderer,
+    get_state,
+    dispatch,
+    composer,
+    shared,
+    scene,
+    camera,
+  } = context
 
   const permanent_modules = PERMANENT_MODULES.map(create => create(shared))
   const game_modules = Object.fromEntries(
