@@ -90,7 +90,8 @@ async function import_chunks() {
 const time = Date.now()
 logger.ASSET('Loading heights..')
 
-fetch(heights)
+// @ts-ignore
+CHUNK_CACHE.loading = fetch(heights)
   .then(response => response.arrayBuffer())
   .then(async heights_buffer => {
     new Int16Array(HEIGHTS).set(new Int16Array(heights_buffer))

@@ -108,12 +108,15 @@ export default function () {
         lerp_factor = 0
       })
 
-      for (let x = -3; x < 3; x++)
-        for (let z = -3; z < 3; z++) {
-          CHUNK_CACHE.get(make_chunk_key({ x, z })).forEach(volume =>
-            instanced_volume.add_volume(volume),
-          )
-        }
+      // @ts-ignore
+      CHUNK_CACHE.loading.then(() => {
+        for (let x = -3; x < 3; x++)
+          for (let z = -3; z < 3; z++) {
+            CHUNK_CACHE.get(make_chunk_key({ x, z })).forEach(volume =>
+              instanced_volume.add_volume(volume),
+            )
+          }
+      })
 
       scene.add(instanced_volume)
 
