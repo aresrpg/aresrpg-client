@@ -110,6 +110,7 @@ export default function () {
 
       // @ts-ignore
       CHUNK_CACHE.loading.then(() => {
+        if (signal.aborted) return
         for (let x = -3; x < 3; x++)
           for (let z = -3; z < 3; z++) {
             CHUNK_CACHE.get(make_chunk_key({ x, z })).forEach(volume =>
@@ -142,6 +143,7 @@ export default function () {
 
         scene.remove(instanced_volume)
         scene.remove(instanced_forest)
+        scene.remove(spotlight)
       })
     },
     tick(state, { camera }, delta) {

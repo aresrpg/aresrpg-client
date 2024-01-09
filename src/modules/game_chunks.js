@@ -106,6 +106,10 @@ export default function () {
 
           TASK_MANAGER.clear()
 
+          // making sure chunks are in memory
+          // @ts-ignore
+          await CHUNK_CACHE.loading
+
           await Promise.all(
             new_chunks.map(async key => {
               const instanced_datas = CHUNK_CACHE.get(key)
